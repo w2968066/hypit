@@ -7,7 +7,12 @@ import {generateFrames,generateVideos} from '../scripts/ecommerce/providers.mjs'
 const escape = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function review(root) {
   const p=await read(path.join(root,'plan.json'));
-  const cards=p.frames.map(f=>`<article><h2>${escape(f.id)}</h2><a href="frames/${f.id}.png"><img src="frames/${f.id}.png"></a><details><summary>生图提示词</summary><p>${escape(f.prompt)}</p></details></article>`).join('');
+  const cards=(await Promise.all(p.frames.map(async f=>{
+    const available=await fs.stat(path.join(root,'frames',f.id+'.png')).then(()=>true).catch(()=>false);
+    const receipt=await read(path.join(root,'receipts','image-'+f.id+'.json')).catch(()=>null);
+    const visual=available?`<a href="frames/${f.id}.png"><img src="frames/${f.id}.png"></a>`:`<p>未完成：${escape(receipt?.reason || receipt?.status || '尚未提交')}</p>`;
+    return `<article><h2>${escape(f.id)}</h2>${visual}<details><summary>生图提示词</summary><p>${escape(f.prompt)}</p></details></article>`;
+  }))).join('');
   const shots=p.shots.map(s=>`<li><b>${s.start}–${s.end} 秒 · ${escape(s.speaker)}</b><p>${escape(s.dialogue)}</p><p>${escape(s.prompt)}</p></li>`).join('');
   await fs.writeFile(path.join(root,'review.html'),`<!doctype html><meta charset="utf-8"><title>母女模板首帧审核</title><style>body{font:17px system-ui;max-width:1300px;margin:30px auto;background:#f4f2ed;color:#252525;padding:20px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}article{background:white;padding:16px}img{width:100%}p{line-height:1.6}li{margin:24px 0}</style><h1>基础版 · 首帧与商品适配审核</h1><p>视频尚未提交。检查女儿身份、开衫细节、上半身取景、母亲与背景连续性。图片通过后再生成视频。</p><div class="grid">${cards}</div><h2>对白与镜头</h2><p>原片转写有疑似错词；商品相关句子已替换为可见外观，尚未确认的功能卖点未沿用。</p><ol>${shots}</ol><p>Grok 使用图片参考，不支持本路线的视频参考。音色与精确对白节奏需要生成后审核。音乐尚未从原片分离。</p>`);
   return {review:path.resolve(root,'review.html')};
