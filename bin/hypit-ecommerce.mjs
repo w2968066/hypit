@@ -37,7 +37,7 @@ async function assemble(root, editFile) {
 }
 async function main() {
   const [cmd,...args]=process.argv.slice(2);
-  if(!cmd || cmd==='--help')return {commands:{compile:'compile analysis.json reference.mp4 new-template-dir',plan:'plan template.json product.json new-run-dir',batch:'batch template.json products-dir new-output-dir',frames:'frames run-dir --submit',review:'review run-dir',approve:'approve run-dir "actual human approval evidence"',videos:'videos run-dir --submit',assemble:'assemble run-dir reviewed-edit.json',status:'status run-dir'}};
+  if(!cmd || cmd==='--help')return {commands:{compile:'compile analysis.json reference.mp4 new-template-dir',plan:'plan template.json product.json new-run-dir',batch:'batch template.json products-dir new-output-dir', 'batch-frames':'batch-frames batch-dir --submit', 'batch-approve':'batch-approve batch-dir "actual whole-batch approval evidence"', 'batch-videos':'batch-videos batch-dir --submit',frames:'frames run-dir --submit',review:'review run-dir',approve:'approve run-dir "actual human approval evidence"',videos:'videos run-dir --submit',assemble:'assemble run-dir reviewed-edit.json',status:'status run-dir'}};
   if(cmd==='compile')return compile(...args);
   if(cmd==='plan')return createPlan(...args);
   if(cmd==='batch') {
@@ -50,6 +50,27 @@ async function main() {
     await save(path.join(output,'batch.json'),results);return results;
   }
   const root=args[0];check(root,'Run directory required');
+  if(['batch-frames','batch-videos','batch-approve'].includes(cmd)) {
+    const manifest=await read(path.join(root,'batch.json'));
+    if(cmd!=='batch-approve')check(args[1]==='--submit','Paid generation requires --submit and user authorization');
+    else check(args[1]?.trim(),'Human whole-batch approval evidence required');
+    return withLock(root,async()=>{
+      const results=[];
+      for(const item of manifest) {
+        if(item.status!=='planned'){results.push(item);continue;}
+        const project=fileAt(root,item.product);
+        try {
+          await withLock(project,async()=>{
+            if(cmd==='batch-frames'){await generateFrames(project);await review(project);}
+            if(cmd==='batch-approve')await approve(project,args[1]);
+            if(cmd==='batch-videos')await generateVideos(project);
+          });results.push({product:item.product,status:'complete'});
+        }catch(e){results.push({product:item.product,status:'failed',reason:e.message});}
+        await save(path.join(root,cmd+'-results.json'),results);
+      }
+      return results;
+    });
+  }
   if(cmd==='review')return review(root);
   if(cmd==='status')return {plan:await read(path.join(root,'plan.json')),receipts:await fs.readdir(path.join(root,'receipts')).catch(()=>[])};
   return withLock(root,async()=>{

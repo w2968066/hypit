@@ -52,6 +52,10 @@ node bin/hypit.mjs ecommerce review new-run
 # Only after the human actually approves these exact images and dialogue:
 node bin/hypit.mjs ecommerce approve new-run "actual user approval evidence"
 node bin/hypit.mjs ecommerce videos new-run --submit
+# For a planned batch, equivalent finite stages preserve each product's receipts:
+node bin/hypit.mjs ecommerce batch-frames batch-output --submit
+node bin/hypit.mjs ecommerce batch-approve batch-output "actual approval of all product reviews"
+node bin/hypit.mjs ecommerce batch-videos batch-output --submit
 ```
 
 Frames run in dependency order: master scene first, then derived views referencing it.
@@ -108,7 +112,7 @@ Sources: [Comfly multipart](https://gpt-best.apifox.cn/api-420646219),
 [APIMart Grok](https://docs.apimart.ai/en/api-reference/videos/grok-imagine/generation).
 
 Still required for a production release: native Runtime integration, safe per-shot retry UX,
-full batch execution and reporting, automatic analysis with reviewed schemas, validated multi-category
+batch review UI and final-assembly automation, automatic analysis with reviewed schemas, validated multi-category
 fixtures, independently reviewed audio separation, robust output codec inspection and full
 distribution regression tests. Current tests are targeted contract/recovery tests, not proof of
 generated visual quality or provider pricing.

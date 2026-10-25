@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {render,validateTemplate,fileAt,save,approve,verifyApproval,withLock,createPlan,read} from '../scripts/ecommerce/core.mjs';
 import {parseImage,parseVideo,executeJob,multipart} from '../scripts/ecommerce/providers.mjs';
 
@@ -55,4 +57,19 @@ test('resume known receipt downloads without submitting again',async()=>{
  const spec={identity:{model:'test'},provider:'comfly',prepare:async()=>({}),submit:'https://example.com/submit',query:'https://example.com/task/',output:'frames/a.png',taskId:r=>r.id,parse:parseImage};
  const transport=async(url,options)=>{if(options.method==='POST'){posts++;return {id:'abc'};}if(options.binary)return bytes;return {data:{status:'SUCCESS',data:{data:[{url:'https://example.com/output'}]}}};};
  await executeJob(root,'test',spec,transport);await fs.unlink(path.join(root,'frames/a.png'));await executeJob(root,'test',spec,transport);assert.equal(posts,1);await fs.rm(root,{recursive:true});
+});
+test('main hypit entry exposes ecommerce without TypeScript runtime setup',()=>{
+ const entry=fileURLToPath(new URL('../bin/hypit.mjs',import.meta.url));
+ const r=spawnSync(process.execPath,[entry,'ecommerce','--help'],{encoding:'utf8'});
+ assert.equal(r.status,0);assert.ok(JSON.parse(r.stdout).commands['batch-videos']);
+});
+test('batch approval reports missing frames while preserving valid product approval',async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'hypit-ecommerce-'));
+ await save(path.join(root,'batch.json'),[{product:'missing',status:'planned'},{product:'valid',status:'planned'}]);
+ for(const name of ['missing','valid'])await save(path.join(root,name,'plan.json'),{references:[],frames:[{id:'wide'}]});
+ await fs.mkdir(path.join(root,'valid','frames'));await fs.writeFile(path.join(root,'valid','frames','wide.png'),'fixture');
+ const entry=fileURLToPath(new URL('../bin/hypit.mjs',import.meta.url));
+ const r=spawnSync(process.execPath,[entry,'ecommerce','batch-approve',root,'fixture review'],{encoding:'utf8'});
+ assert.equal(r.status,0);const result=JSON.parse(r.stdout);assert.equal(result[0].status,'failed');assert.equal(result[1].status,'complete');await verifyApproval(path.join(root,'valid'));
+ await fs.rm(root,{recursive:true});
 });
