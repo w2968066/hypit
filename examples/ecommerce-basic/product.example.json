@@ -1,0 +1,18 @@
+{
+  "id": "cardigan",
+  "category": "cardigan",
+  "image_size": "2K",
+  "references": [
+    "reference.png"
+  ],
+  "slots": {
+    "product_description": "女儿穿参考拼图中的深炭灰色针织开衫，正面浅蓝与浅紫菱格图案，深色门襟纽扣、立起的小领口和罗纹袖口",
+    "product_short": "开衫",
+    "unit": "件",
+    "product_intro": "这款菱格针织开衫",
+    "visible_appeal": "菱格好看还好搭",
+    "detail_dialogue": "领口一排扣子，菱格花纹清楚，袖口也是收口的。",
+    "matching_item": "条白色长裤",
+    "setting": "温馨的浅奶油色客厅，左侧窗户有薄纱帘，浅木地板，右侧沙发后面是浅色墙和一幅小装饰画，窗光柔和。保持真实日常居家感"
+  }
+}

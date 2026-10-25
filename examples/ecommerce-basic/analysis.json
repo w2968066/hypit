@@ -1,0 +1,100 @@
+{
+  "schema": "hypit.ecommerce.template.v1",
+  "id": "mother-daughter-link",
+  "version": "0.1.0",
+  "tier": "basic",
+  "reviewed": true,
+  "analysis_status": {
+    "structure": "reviewed from frames",
+    "transcript": "local ASR; wording needs review",
+    "music": "mixed source only"
+  },
+  "visual_cut_candidates": [
+    2.133333,
+    3.066667,
+    6.533333,
+    9.133333,
+    11.733333
+  ],
+  "physical_anchors": [
+    "母亲始终坐在画面右侧沙发上，身体接触坐垫，双脚落地",
+    "女儿站在左侧，与母亲自然对视"
+  ],
+  "categories": {
+    "cardigan": {
+      "overall_focus": "上半身完整开衫，从头部到胯部，领口、门襟、衣摆都在画面中",
+      "detail_focus": "胸前菱格针织纹理与门襟纽扣，上半身特写",
+      "show_action": "女儿自然用手示意胸前菱格和门襟，手不遮住图案",
+      "focus_guard": "聚焦上半身商品，不拍裤腰裤腿"
+    },
+    "trousers": {
+      "overall_focus": "下半身完整裤型，从腰头到鞋子",
+      "detail_focus": "裤腰结构、裤侧缝与面料，下半身特写",
+      "show_action": "女儿自然示意裤腰和裤腿侧缝",
+      "focus_guard": "聚焦下半身商品，不拍上衣领口"
+    }
+  },
+  "frames": [
+    {
+      "id": "wide",
+      "prompt": "A photograph captured as a single frame from a video actually shot on an iPhone, with the texture of real iPhone footage. The image looks real, without an oily, overprocessed finish. The background is clearly visible, with no depth-of-field blur. Skin texture is natural and fine, and the lighting is natural. The image is coherent and free of visual artifacts.\n参考拼图提供同一个女儿的脸、发型、商品和穿搭，不要把拼图边框复制到成片。保留女儿的脸型、长黑发与白色发夹，双眼自然睁开。{{product_description}}，搭配参考中的白色长裤和白鞋。生成单张真实家庭短视频全景：女儿站在左侧，身体略朝右，与右侧坐着的妈妈对话。妈妈是新设计的成年女性，棕色齐肩短发，浅橄榄绿衬衫、米色长裤，面容与女儿不同，坐在浅米色布艺沙发上，双脚落地，手拿手机并抬头看女儿。{{setting}}。画面中仅这两人；全身入镜，正常儿童身体比例，商品如参考。没有文字、拼接边框、贴片或商标水印。"
+    },
+    {
+      "id": "medium",
+      "parent": "wide",
+      "prompt": "A photograph captured as a single frame from a video actually shot on an iPhone, with the texture of real iPhone footage. The image looks real, without an oily, overprocessed finish. The background is clearly visible, with no depth-of-field blur. Skin texture is natural and fine, and the lighting is natural. The image is coherent and free of visual artifacts.\n第一张参考图是已确定的家庭场景与人物锚点，后面的拼图是商品和女儿身份参考。完全保留第一张中的女儿、商品、母亲、房间、光线与左右关系，仅让摄影机靠近女儿，改为{{overall_focus}}。{{show_action}}。右后方妈妈仍然坐在同一沙发上，允许局部出画，不改变她的位置。商品细节以拼图为准。单张连续场景，无字幕或拼图。"
+    },
+    {
+      "id": "detail",
+      "parent": "wide",
+      "prompt": "A photograph captured as a single frame from a video actually shot on an iPhone, with the texture of real iPhone footage. The image looks real, without an oily, overprocessed finish. The background is clearly visible, with no depth-of-field blur. Skin texture is natural and fine, and the lighting is natural. The image is coherent and free of visual artifacts.\n第一张参考图锁定同一个女儿、商品、家庭场景和光线，后面的拼图补充商品真实细节。摄影机靠近拍摄{{detail_focus}}，让实际商品占画面主要面积；{{show_action}}。严格保留商品参考图中的结构、颜色、图案和材质外观，不凭空增加标志或结构。背景仍是同一沙发和墙面的一小部分。商品特写没有脸部也可以，{{focus_guard}}。无文字无拼接边框。"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s1",
+      "start": 0,
+      "end": 2.9,
+      "frame": "wide",
+      "speaker": "女儿",
+      "dialogue": "妈，我同学问我这{{product_short}}在哪儿买的，她也想买一{{unit}}。",
+      "prompt": "女儿站在左侧，带着开心又好奇的神情问右侧坐着的妈妈。妈妈抬头听，不抢话。女儿使用自然明亮的女孩普通话音色，妈妈使用温和的成年女性普通话。保持参考图身份与房间。女儿整句尽量在前2.9秒自然快速说完，其后安静停留。"
+    },
+    {
+      "id": "s2",
+      "start": 2.9,
+      "end": 6.62,
+      "frame": "medium",
+      "speaker": "母亲（画外音）",
+      "dialogue": "这是开学给你买的，{{product_intro}}，难怪你同学会看上。",
+      "prompt": "{{overall_focus}}。{{show_action}}。右侧妈妈温和地回答，使用成年女性普通话；取景聚焦商品，女儿听着不说话。整句尽量在前3.72秒自然快速说完，其后安静停留。"
+    },
+    {
+      "id": "s3",
+      "start": 6.62,
+      "end": 9.14,
+      "frame": "wide",
+      "speaker": "女儿",
+      "dialogue": "{{visible_appeal}}，班里好多女生都在找这种。",
+      "prompt": "母女同框，女儿带一点开心的小得意，向妈妈分享同学的反应，母亲微笑听。女儿使用与开场一致的自然明亮女孩普通话音色，整句尽量在前2.52秒说完，其后安静停留。"
+    },
+    {
+      "id": "s4",
+      "start": 9.14,
+      "end": 11.82,
+      "frame": "detail",
+      "speaker": "母亲（画外音）",
+      "dialogue": "{{detail_dialogue}}",
+      "prompt": "{{detail_focus}}。{{show_action}}。镜头稳定，只有轻微自然动作。妈妈在画外使用与之前一致的温和成年女性普通话，整句尽量在前2.68秒说完，其后安静停留。"
+    },
+    {
+      "id": "s5",
+      "start": 11.82,
+      "end": 14.953651,
+      "frame": "wide",
+      "speaker": "女儿",
+      "dialogue": "我早上随便搭{{matching_item}}就可以出门上学了，穿搭挺省事的。",
+      "prompt": "母女同框，女儿轻轻示意整套穿搭，然后看向妈妈笑，母亲自然回应微笑。女儿保持开场的自然明亮女孩普通话音色，整句尽量在前3.13秒说完，其后安静停留。"
+    }
+  ]
+}
