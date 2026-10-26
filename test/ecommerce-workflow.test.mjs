@@ -8,7 +8,7 @@ import {grill,grillQuestions,approveGrill,productInfo} from '../scripts/ecommerc
 import {inspect,recordQuality,verifyQuality,setQuality} from '../scripts/ecommerce/quality.mjs';
 import {prepareRetry,jobId,assertNoPending,completeAttempt} from '../scripts/ecommerce/attempts.mjs';
 import {generateFrames,generateVideos,executeJob} from '../scripts/ecommerce/providers.mjs';
-import {finishCaptions} from '../scripts/ecommerce/finishing.mjs';
+import {finishCaptions,alignCaptions} from '../scripts/ecommerce/finishing.mjs';
 
 async function fixture(t){
   const prefix=path.resolve(os.tmpdir(),'hypit-ecommerce-contract-'),root=await fs.mkdtemp(prefix);
@@ -25,6 +25,16 @@ test('universal narrative accepts a non-apparel product and applies agreed defau
   assert.deepEqual(hint.missing,[]);
   const p=await createPlan(path.join(root,'template.json'),product,path.join(root,'run'));
   assert.equal(p.image_size,'4K');assert.equal(p.video_resolution,'720p');assert.equal(p.aspect_ratio,'9:16');assert.equal(p.scene_anchor,'scene');assert.equal(p.quality_check.enabled,true);assert.equal(p.captions.safe_area.bottom,315);
+});
+test('music-only reference has no forced speech/captions and skips unnecessary ASR',async t=>{
+  const root=await fixture(t),product=await productFixture(root),templateFile=path.join(root,'template.json'),template=await read(templateFile);
+  template.shots[0].dialogue='';template.captions={enabled:false};await save(templateFile,template);
+  const run=path.join(root,'run'),p=await createPlan(templateFile,product,run);assert.equal(p.audio_mode,'music_only');assert.equal(p.captions.enabled,false);assert.equal(p.music_required,true);
+  const edit=path.join(root,'edit.json');await save(edit,{shots:[]});assert.equal((await alignCaptions(run,edit)).status,'skipped');
+  await fs.mkdir(path.join(run,'frames'));await fs.writeFile(path.join(run,'frames/scene.png'),'fixture');await approve(run,'fixture image review');await setQuality(run,'off');
+  const key=process.env.APIMART_API_KEY;delete process.env.APIMART_API_KEY;
+  try {const result=await generateVideos(run);assert.match(result.prompt,/无对白/);assert.doesNotMatch(result.prompt,/原生中文对白/);}
+  finally {if(key!==undefined)process.env.APIMART_API_KEY=key;}
 });
 test('approved product knowledge survives render-setting changes and revisions revoke stale knowledge',async t=>{
   const root=await fixture(t),file=await productFixture(root);

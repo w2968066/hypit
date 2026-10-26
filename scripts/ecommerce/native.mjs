@@ -17,7 +17,7 @@ export async function importNative(root,type,id,source,evidence){
   if(type==='video'){
     const shot=p.shots.find(s=>s.id===id);
     check(Number(metadata.format.duration)+0.05>=shot.target_duration,'Native clip is too short for the planned dialogue');
-    check(metadata.streams.some(s=>s.codec_type==='audio'),'Native dialogue video has no audio');
+    check(!shot.dialogue.trim() || metadata.streams.some(s=>s.codec_type==='audio'),'Native dialogue video has no audio');
   }
   const target=fileAt(root,`${type==='image'?'frames':'clips'}/${id}.${type==='image'?'png':'mp4'}`);
   await fs.mkdir(path.dirname(target),{recursive:true});

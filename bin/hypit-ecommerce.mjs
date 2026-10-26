@@ -67,18 +67,20 @@ async function assemble(root, editFile) {
   check(edit.reviewed===true && edit.evidence,'Reviewed video trims and human evidence required');
   check(edit.shots?.length===p.shots.length,'Every shot must have a reviewed trim');
   await fs.mkdir(path.join(root,'assembly'),{recursive:true});
+  const music=await musicForAssembly(root,edit,editFile);
+  check(!p.music_required || music,'This music-only template requires a prepared music library or explicitly selected soundtrack');
   const inputs=[];
   for(let i=0;i<p.shots.length;i++) {
     const s=p.shots[i], e=edit.shots[i];check(e.id===s.id && Number.isFinite(e.start) && e.start>=0,'Invalid trim');
     const duration=e.duration ?? s.target_duration;check(Number.isFinite(duration)&&duration>0,'Invalid edited duration');
-    check(e.start+duration<=Number(probe(fileAt(root,`clips/${s.id}.mp4`)).format.duration)+.05,'Trim exceeds actual clip duration');
-    check(e.dialogue_complete===true,'Review complete spoken dialogue before cutting');
+    const metadata=probe(fileAt(root,`clips/${s.id}.mp4`)),hasAudio=metadata.streams.some(stream=>stream.codec_type==='audio');
+    check(e.start+duration<=Number(metadata.format.duration)+.05,'Trim exceeds actual clip duration');
+    check(!s.dialogue.trim() || e.dialogue_complete===true,'Review complete spoken dialogue before cutting');
     const output=path.join(root,'assembly',`${i}.mp4`);
-    media(['-y','-ss',String(e.start),'-i',fileAt(root,`clips/${s.id}.mp4`),'-t',String(duration),'-vf','scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-ar','48000','-ac','2',output]);inputs.push(`file '${i}.mp4'`);
+    media(['-y','-ss',String(e.start),'-i',fileAt(root,`clips/${s.id}.mp4`),...(!hasAudio?['-f','lavfi','-i','anullsrc=r=48000:cl=stereo']:[]),'-map','0:v:0','-map',hasAudio?'0:a:0':'1:a:0','-t',String(duration),'-vf','scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-ar','48000','-ac','2',output]);inputs.push(`file '${i}.mp4'`);
   }
   await fs.writeFile(path.join(root,'assembly','concat.txt'),inputs.join('\n'));
   media(['-y','-f','concat','-safe','0','-i',path.join(root,'assembly','concat.txt'),'-c','copy',path.join(root,'assembly','dialogue.mp4')]);
-  const music=await musicForAssembly(root,edit,editFile);
   if(music) {
     const musicEnd=Number(probe(path.join(root,'assembly','dialogue.mp4')).format.duration);
     media(['-y','-i',path.join(root,'assembly','dialogue.mp4'),'-stream_loop','-1','-i',music.file,'-filter_complex',`[1:a]volume=${music.gain},afade=t=in:st=0:d=0.25,afade=t=out:st=${Math.max(0,musicEnd-0.6)}:d=0.6[m];[0:a][m]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[a]`,'-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-shortest',path.join(root,'assembly','mixed.mp4')]);

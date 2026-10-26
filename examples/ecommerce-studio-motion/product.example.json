@@ -1,0 +1,18 @@
+{
+  "id": "source-trousers-example",
+  "category": "trousers",
+  "image_size": "4K",
+  "references": [
+    "reference.png"
+  ],
+  "facts": {
+    "source": "仅根据参考视频可见外观",
+    "color": "深藏青色",
+    "shape": "宽松长裤",
+    "details": "浅色长抽绳及小型浅色图案，位置以图片为准"
+  },
+  "slots": {
+    "product_description": "模特穿参考图片中的深藏青色宽松长裤，保留真实抽绳、裤腿轮廓和小型浅色图案；不要增加未提供的品牌文字",
+    "styling": "穿简洁白色长袖上衣和白色运动鞋，上衣不要有源视频无关文字，非主商品外观服从用户提供的参考"
+  }
+}

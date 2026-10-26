@@ -95,9 +95,10 @@ export async function createPlan(templateFile, productFile, destination) {
   const constraints=[...anchors,...(variables.focus_guard?[variables.focus_guard]:[])].join('。');
   const prompt=text=>render(text,variables)+(constraints?'\n空间与取景约束：'+constraints:'');
   const frames=t.frames.map(f=>({...f,prompt:prompt(f.prompt)}));
-  const shots=t.shots.map(s=>({...s,prompt:prompt(p.adaptation?.shots?.[s.id]?.prompt || s.prompt),dialogue:render(p.adaptation?.shots?.[s.id]?.dialogue || s.dialogue,variables),
+  const shots=t.shots.map(s=>({...s,prompt:prompt(p.adaptation?.shots?.[s.id]?.prompt ?? s.prompt),dialogue:render(p.adaptation?.shots?.[s.id]?.dialogue ?? s.dialogue,variables),
     generation_duration:Math.max(6,Math.ceil(s.end-s.start)),target_duration:Number((s.end-s.start).toFixed(6))}));
   for (const s of shots) check(s.generation_duration<=15,'Grok duration exceeds 15 seconds');
+  const audioMode=shots.some(s=>s.dialogue.trim())?'dialogue':'music_only';
   await fs.mkdir(destination,{recursive:false}); await fs.mkdir(path.join(destination,'references'));
   const references=[];
   for (let i=0;i<p.references.length;i++) {
@@ -107,7 +108,7 @@ export async function createPlan(templateFile, productFile, destination) {
   }
   const plan={schema:'hypit.ecommerce.plan.v1',tier:'basic',template:{id:t.id,version:t.version,digest:hash(JSON.stringify(t))},
     product:p.id,category:p.category,image_model:'gemini-nano-banana-2.1',image_size:p.image_size || '4K',video_model:'grok-imagine-1.5-video-ext',video_resolution:'720p',aspect_ratio:'9:16',scene_anchor:p.scene_anchor || t.frames[0].id,
-    quality_check:{enabled:p.quality_check?.enabled ?? (p.quality_check!==false)},captions:{enabled:p.captions?.enabled ?? (p.captions!==false),safe_area:{left:42,right:145,bottom:315},font_size:38},fallback:{image:'native-if-available',video:'native-if-available'},
+    audio_mode:audioMode,music_required:audioMode==='music_only',quality_check:{enabled:p.quality_check?.enabled ?? (p.quality_check!==false)},captions:{enabled:p.captions?.enabled ?? (p.captions===false?false:t.captions?.enabled ?? audioMode==='dialogue'),safe_area:{left:42,right:145,bottom:315},font_size:38},fallback:{image:'native-if-available',video:'native-if-available'},
     references,frames,shots,music:{status:'needs_separation_review'},grill:grillBrief,limits:{image_tasks:frames.length,video_tasks:shots.length},
     caveats:['No reference-video input in basic tier','Voice and timing require output review','Generated clips are at least 6s; reviewed trims required']};
   check(['1K','2K','4K'].includes(plan.image_size),'Invalid image size');

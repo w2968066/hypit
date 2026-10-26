@@ -160,6 +160,10 @@ Assembly accepts reviewed JSON cues or SRT and burns captions into the final vid
 at 720×1280 default to left 42, right 145, bottom 315, font size 38. These come from the user's
 supplied Douyin interface example. `captions.safe_area` overrides them for a different interface.
 Explicit `edit.captions: false` skips captions.
+Templates with no dialogue default to `audio_mode: music_only`, disable spoken captions and
+skip ASR. A music-only assembly requires an explicitly selected track or user music library.
+Silent generated clips are given a silent audio bed during normalization so they can be
+joined and mixed with music. Song vocals in source audio never become a dialogue script.
 
 Visual model checks default on. `quality run-dir off` opts out for speed and incurs no visual
 review work; `quality run-dir on` enables them again. `inspect run-dir frames|videos` prepares

@@ -132,7 +132,8 @@ export async function generateVideos(root) {
       ? '参考图1锁定角色身份、空间关系与全景构图；后续商品图锁定商品外观。'
       : '参考图1锁定同一组角色、场景和空间关系；参考图2锁定本镜头的商品取景；后续商品图锁定商品实际外观。';
     // Permission is checked above; an unrelated frame's reapproval must not invalidate this shot's media inputs.
-    const fields={model:p.video_model,prompt:visualRoles+'\n'+s.prompt+'\n原生中文对白，逐字说：'+s.dialogue+'\n不要字幕、水印、背景音乐或新增人物。',duration:s.generation_duration,size:p.aspect_ratio || '9:16',resolution:p.video_resolution || '720p'},identity={fields,refs:files.map(x=>hash(x.bytes))},receiptId=await jobId(root,'video',s.id);
+    const speech=s.dialogue.trim()?'原生中文对白，逐字说：'+s.dialogue:'本镜头无对白、无口播、无歌唱；只表演画面动作，配乐由后期添加。';
+    const fields={model:p.video_model,prompt:visualRoles+'\n'+s.prompt+'\n'+speech+'\n不要字幕、水印、背景音乐或新增人物。',duration:s.generation_duration,size:p.aspect_ratio || '9:16',resolution:p.video_resolution || '720p'},identity={fields,refs:files.map(x=>hash(x.bytes))},receiptId=await jobId(root,'video',s.id);
     if(await done(root,receiptId,identity,`clips/${s.id}.mp4`)){await completeAttempt(root,'video',s.id);continue;}
     try {check(process.env.APIMART_API_KEY,'APIMART_API_KEY missing');await executeJob(root,receiptId,{provider:'apimart',key:process.env.APIMART_API_KEY,
       identity,

@@ -1,0 +1,196 @@
+{
+  "schema": "hypit.ecommerce.template.v1",
+  "id": "studio-motion-detail",
+  "name": "单人棚拍·动态展示与细节证明",
+  "version": "1.0.0",
+  "tier": "basic",
+  "reviewed": true,
+  "analysis_status": {
+    "structure": "Agent visually inspected 0.5s overview and frame-level strips around candidate transitions; hard cuts at 2.0 and 4.3 seconds",
+    "audio": "Local small ASR identified music vocals, no product dialogue; lyrics are not validated or reused as speech",
+    "generation": "Template compiled and plan validated; no new image/video generation performed"
+  },
+  "source_observations": {
+    "video_duration": 8.433333,
+    "container_duration": 8.451995,
+    "width": 576,
+    "height": 1024,
+    "fps": 30,
+    "people": 1,
+    "face": "outside crop",
+    "product": "深藏青色宽松长裤、浅色长抽绳、小型浅色标识，搭配白色上衣和白鞋",
+    "camera": "第三人称，正面/侧面商品展示；后段近景轻微向下取景",
+    "dialogue": false,
+    "original_music_contains_sung_vocals": true,
+    "subtitles_observed": false,
+    "unsupported_claims": [
+      "未核实面料成分",
+      "未核实保暖、耐磨、抗起球性能",
+      "没有尺寸或伸长率测量"
+    ]
+  },
+  "visual_cut_candidates": [
+    0.633333,
+    1.333333,
+    2,
+    2.633333,
+    4.3
+  ],
+  "visual_cut_review": {
+    "accepted": [
+      2,
+      4.3
+    ],
+    "not_treated_as_cuts": [
+      0.633333,
+      1.333333,
+      2.633333
+    ],
+    "reason": "前两处随步态变化，2.63秒附近是侧向走动转正面并抬臂的连续动作；不把所有像素差峰值当硬切"
+  },
+  "narrative": {
+    "hook": "第一帧就看见商品，在真实互动中展示轮廓",
+    "angle": "改变观察角度后停稳，给观众完整外形信息",
+    "evidence": "近景以一次轻柔操作和表面触摸证明可见结构与外观",
+    "abstraction": "动作展示→换角度展示→结构/表面细节。替换产品后保留意图，重写身体部位、持握方式和证明动作"
+  },
+  "audio": {
+    "mode": "music_only",
+    "music_policy": "user_prepared_library",
+    "source_soundtrack": "reference only; contains song vocals, not a dialogue script",
+    "beat_policy": "Source cuts preserve its visual pacing. A randomly chosen library track is not claimed to match the original beat grid."
+  },
+  "captions": {
+    "enabled": false
+  },
+  "defaults": {
+    "lead_identity": "单人展示者，身份和体态以用户角色参考为准；本模板默认面部在画面外，不凭源视频推断年龄",
+    "setting": "浅灰白无缝摄影棚、浅灰地面、柔和漫射光，保留脚底或商品接触面的轻微真实阴影",
+    "styling": "非主商品服装和配饰简洁中性，以用户已有搭配资料为准，不复制源视频无关品牌文字",
+    "overall_focus": "完整展示目标商品和必要的人体或持握区域，使商品在画面中可辨认",
+    "detail_focus": "聚焦产品参考图中确实存在的核心结构与表面外观，随商品迁移细节焦点",
+    "motion_action": "在合理使用状态下，以自然小步或手持角度变化展示商品的完整外形",
+    "turn_action": "用一个小角度的身体转向或商品转向，展示不同角度；人物和商品不瞬移",
+    "presentation_action": "随后停稳展示商品，双手不遮挡主体和关键外观，不增加新人物",
+    "proof_action": "对真实存在的结构做一次轻柔、可逆的接触展示；不演示未核实功能，不夸大变形",
+    "surface_action": "接着用手在商品表面轻轻示意一次，让镜头看清外观细节，不凭空改变产品状态",
+    "focus_guard": "取景、接触位置和动作跟随目标商品，禁止机械保留源裤装的下半身或腰头动作；商品颜色、图案和真实结构不漂移"
+  },
+  "physical_anchors": [
+    "现场只有一位展示者，摄影机为第三人称，不出现拍摄者身体或第二位模特",
+    "商品保持合理穿着、持握或支撑；可见的双脚接触地面，双手接触商品时不穿透",
+    "主体、商品、摄影棚与光线跨镜头一致；源视频无关字样或标志不复制到新商品"
+  ],
+  "categories": {
+    "trousers": {
+      "overall_focus": "从腰头到鞋子展示完整裤型，裤脚和脚底保留在画面内，面部在画面外",
+      "detail_focus": "裤腰、真实抽绳或门襟、靠镜头一侧裤腿与面料外观",
+      "motion_action": "模特穿着目标裤子朝摄影机自然走两小步，裤腿随步态摆动，脚不滑行",
+      "turn_action": "模特侧向走一小步后转回正面",
+      "presentation_action": "正面停稳，允许双臂在胸前轻交叉，但不能遮住裤腰和裤型",
+      "proof_action": "仅当目标商品确有松紧腰头时，双手轻拉腰头两侧一次后放松；非松紧结构改为示意真实门襟，不能强拉",
+      "surface_action": "一只手沿靠镜头一侧裤腿表面轻抚一次，镜头轻微下移看清裤腿外观",
+      "focus_guard": "裤装聚焦下半身，保留真实裤型与裤脚；不得把手伸进面料或把腰头无限拉长"
+    },
+    "cardigan": {
+      "overall_focus": "上半身从肩部到衣摆展示完整开衫，清楚保留领口、门襟和袖口",
+      "detail_focus": "开衫真实领口、门襟纽扣、袖口及针织表面",
+      "motion_action": "模特穿着目标开衫自然向前走两小步，衣摆轻微随动",
+      "turn_action": "上半身小幅侧转后回到正面，展示肩线与侧面轮廓",
+      "presentation_action": "双手自然下垂或轻扶衣摆，避免抱臂遮住胸前图案和门襟",
+      "proof_action": "轻提真实衣摆或示意门襟一次，不拉扯领口，不把原裤腰抽绳搬到上衣",
+      "surface_action": "用手轻轻示意前襟或袖口的针织外观，不遮住主要图案",
+      "focus_guard": "开衫聚焦上半身，不拍裤腰裤腿，不沿用拉裤腰动作"
+    },
+    "packaged_goods": {
+      "overall_focus": "以手持或真实支撑状态完整展示商品包装，镜头聚焦手和商品",
+      "detail_focus": "商品参考图中可见的包装开合结构、边缘和表面印刷细节",
+      "motion_action": "单人稳定持握商品，向前展示或轻微改变持握角度，保持真实尺寸",
+      "turn_action": "用手缓慢转过一个小角度展示侧面，再回正",
+      "presentation_action": "正面停稳，双手不挡住商品主体和主要印刷区域",
+      "proof_action": "仅对已确认可操作的开合结构做一次轻柔示意；未核实能否开封时只展示外观",
+      "surface_action": "手指在商品表面或边缘轻轻示意一次，不凭空开封或改变内容物",
+      "focus_guard": "聚焦商品和持握动作；不套用服装腰头、穿着姿势或下半身构图"
+    }
+  },
+  "frames": [
+    {
+      "id": "wide",
+      "prompt": "A single frame from ordinary phone-shot ecommerce footage. Soft diffuse studio light, a plain continuous background, visible natural fabric and hand details; no glossy CGI finish. {{lead_identity}}。{{product_description}}。{{styling}}。{{setting}}。第三人称正面商品全貌取景：{{overall_focus}}。只有一位展示者，动作准备状态，商品未变形。无字幕、无水印、无新品牌文字。"
+    },
+    {
+      "id": "angle",
+      "parent": "wide",
+      "prompt": "A single frame from ordinary phone-shot ecommerce footage. Soft diffuse studio light, a plain continuous background, visible natural fabric and hand details; no glossy CGI finish. 参考图1锁定同一人物、商品、摄影棚与光线，其余参考图锁定目标商品。派生一个合理小角度侧面动作起始画面：{{overall_focus}}。为{{turn_action}}准备姿势，关键商品保持可见。仅改变观察角度和自然姿态，不换脸、不换商品、不复制源视频无关标志。"
+    },
+    {
+      "id": "detail",
+      "parent": "wide",
+      "prompt": "A single frame from ordinary phone-shot ecommerce footage. Soft diffuse studio light, a plain continuous background, visible natural fabric and hand details; no glossy CGI finish. 参考图1锁定人物、商品和摄影棚，其余参考图补充商品真实细节。近景聚焦{{detail_focus}}；手保持在商品表面前方，为{{proof_action}}准备，接触关系可信。相邻背景和光线继承主图，商品不过度拉伸，无文字或拼接边框。"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s1",
+      "start": 0,
+      "end": 2,
+      "frame": "wide",
+      "speaker": "none",
+      "dialogue": "",
+      "intent": "开场动态识别：商品从第一帧可见，以小幅运动展示整体轮廓",
+      "prompt": "{{overall_focus}}。从0秒立即开始{{motion_action}}，不先演脸部表情，不加空白片头。摄影机保持第三人称固定位置，脚步与商品运动符合接触关系。在本镜头前2秒完成一轮动作，之后自然停稳供剪辑。"
+    },
+    {
+      "id": "s2",
+      "start": 2,
+      "end": 4.3,
+      "frame": "angle",
+      "speaker": "none",
+      "dialogue": "",
+      "intent": "换角度后停稳，展示完整外形",
+      "prompt": "{{overall_focus}}。先{{turn_action}}，再{{presentation_action}}；动作在本镜头前2.3秒完成并停稳。保持上一镜头同一人、同一商品、同一背景和光线；不突然增加第二个人，不做大幅走秀或无关表情。"
+    },
+    {
+      "id": "s3",
+      "start": 4.3,
+      "end": 8.433333,
+      "frame": "detail",
+      "speaker": "none",
+      "dialogue": "",
+      "intent": "一次结构示意接一次表面细节，让外观证据成立",
+      "prompt": "近景拍{{detail_focus}}。前约1秒执行{{proof_action}}，随后约3秒执行{{surface_action}}，轻微移动取景以看清目标细节，动作结束后自然停住。不把证明动作变成夸张拉伸或形变，不制造未确认的产品功能；不要回切面部或无关裤腿。"
+    }
+  ],
+  "beat_map": [
+    {
+      "start": 0,
+      "end": 2,
+      "shot": "s1",
+      "function": "动态全貌"
+    },
+    {
+      "start": 2,
+      "end": 2.8,
+      "shot": "s2",
+      "function": "角度转换"
+    },
+    {
+      "start": 2.8,
+      "end": 4.3,
+      "shot": "s2",
+      "function": "停稳展示"
+    },
+    {
+      "start": 4.3,
+      "end": 5.3,
+      "shot": "s3",
+      "function": "结构接触示意"
+    },
+    {
+      "start": 5.3,
+      "end": 8.433333,
+      "shot": "s3",
+      "function": "表面质感与局部轮廓"
+    }
+  ]
+}
