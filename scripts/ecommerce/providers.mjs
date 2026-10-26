@@ -3,6 +3,8 @@ import path from 'node:path';
 import https from 'node:https';
 import crypto from 'node:crypto';
 import {check,hash,read,save,fileAt,verifyApproval} from './core.mjs';
+import {jobId,completeAttempt} from './attempts.mjs';
+import {verifyQuality} from './quality.mjs';
 
 export function request(url,{method='GET',key,body,contentType,timeout=600000,binary=false}={}) {
   check(new URL(url).protocol==='https:','HTTPS required');
@@ -15,7 +17,7 @@ export function request(url,{method='GET',key,body,contentType,timeout=600000,bi
       const chunks=[];
       response.on('data',chunk=>chunks.push(chunk));response.on('error',()=>reject(new Error('Response read failed')));
       response.on('end',()=>{
-        if(response.statusCode<200 || response.statusCode>=300) return reject(new Error(`Provider HTTP ${response.statusCode}; no automatic POST retry`));
+        if(response.statusCode<200 || response.statusCode>=300) {const error=new Error(`Provider HTTP ${response.statusCode}; no automatic POST retry`);error.httpStatus=response.statusCode;return reject(error);}
         const bytes=Buffer.concat(chunks);
         try {resolve(binary?bytes:JSON.parse(bytes.toString('utf8')));}catch{reject(new Error('Provider returned invalid JSON'));}
       });
@@ -55,14 +57,17 @@ export async function executeJob(root,id,spec,transport=request) {
     if(receipt.status==='downloaded') {
       try {if(hash(await fs.readFile(fileAt(root,spec.output)))===receipt.output_sha256)return receipt;} catch(e){if(e.code!=='ENOENT')throw e;}
     }
-    check(receipt.task_id,'Previous POST outcome unknown: reconcile manually; never auto-resubmit');
     check(receipt.status!=='failed','Task failed; no automatic paid retry');
+    check(receipt.task_id,'Previous POST outcome unknown: reconcile manually; never auto-resubmit');
   } else {
     // Prepare uploads first. No billable POST has occurred if preparation fails.
     const submitOptions=await spec.prepare();
     receipt={digest,status:'submitting',at:new Date().toISOString(),provider:spec.provider};
     await save(receiptFile,receipt);
-    const response=await transport(spec.submit,{...submitOptions,method:'POST',key:spec.key});
+    let response;
+    try {response=await transport(spec.submit,{...submitOptions,method:'POST',key:spec.key});}
+    catch(error){if(error.httpStatus>=400&&error.httpStatus<500&&error.httpStatus!==408){receipt.status='failed';receipt.reason=error.message;await save(receiptFile,receipt);}throw error;}
+    if(response.error){receipt.status='failed';receipt.reason='Provider rejected submission';await save(receiptFile,receipt);throw new Error(receipt.reason);}
     const task=spec.taskId(response);check(typeof task==='string' && /^[a-zA-Z0-9_-]+$/.test(task),'No task ID; submission outcome unknown');
     receipt.task_id=task;receipt.status='submitted';await save(receiptFile,receipt);
   }
@@ -89,31 +94,48 @@ export async function executeJob(root,id,spec,transport=request) {
 }
 function mime(file){return file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':'image/jpeg';}
 async function assets(root,refs){return Promise.all(refs.map(async(ref,i)=>({field:'image',name:`ref-${i}${path.extname(ref)}`,mime:mime(ref),bytes:await fs.readFile(fileAt(root,ref))})));}
+async function done(root,id,identity,output){const receipt=await optional(fileAt(root,`receipts/${id}.json`));return receipt?.status==='downloaded'&&receipt.digest===hash(JSON.stringify(identity))&&receipt.output_sha256===hash(await fs.readFile(fileAt(root,output)).catch(e=>{if(e.code==='ENOENT')return Buffer.alloc(0);throw e;}));}
+async function nativeHandoff(root,type,id,refs,fields,identity,receiptId,error){
+  const receipt=await optional(fileAt(root,`receipts/${receiptId}.json`));
+  if(receipt && receipt.status!=='failed'){
+    if(!receipt.task_id)throw new Error('API submission outcome unknown; reconcile it before native fallback or another API submission');
+    throw error;
+  }
+  const request={schema:'hypit.ecommerce.native-request.v1',type,id,api_receipt:receiptId,digest:hash(JSON.stringify(identity)),plan_digest:hash(JSON.stringify(await read(path.join(root,'plan.json')))),reference_sha256:identity.refs,prompt:fields.prompt,references:refs.map(x=>path.resolve(root,x)),requested:fields,
+    reason:String(error.message).slice(0,300),instruction:`Check the current agent tools for native ${type} generation. Use it if available, preserving references and 9:16. Otherwise report capability unavailable; never claim a generated output. Import the returned local file with native-import. Preserve the API receipt; do not auto-resubmit.`};
+  const file=fileAt(root,`native-fallback/${type}-${id}.json`);await save(file,request);
+  return {status:'native_fallback_required',request:path.resolve(file),...request};
+}
 export async function generateFrames(root) {
-  check(process.env.COMFLY_API_KEY,'COMFLY_API_KEY missing');
   const p=await read(path.join(root,'plan.json'));
   for(const f of p.frames) {
     const refs=[...(f.parent?[`frames/${f.parent}.png`]:[]),...p.references];
     const files=await assets(root,refs);
-    const fields={model:p.image_model,prompt:f.prompt,aspect_ratio:'9:16',image_size:p.image_size,response_format:'url'};
-    await executeJob(root,'image-'+f.id,{provider:'comfly',key:process.env.COMFLY_API_KEY,
-      identity:{fields,refs:files.map(x=>hash(x.bytes))},submit:'https://ai.comfly.org/v1/images/edits?async=true',query:'https://ai.comfly.org/v1/images/tasks/',
+    const fields={model:p.image_model,prompt:f.prompt,aspect_ratio:p.aspect_ratio || '9:16',image_size:p.image_size || '4K',response_format:'url'},identity={fields,refs:files.map(x=>hash(x.bytes))},receiptId=await jobId(root,'image',f.id);
+    if(await done(root,receiptId,identity,`frames/${f.id}.png`)){await completeAttempt(root,'image',f.id);continue;}
+    try {check(process.env.COMFLY_API_KEY,'COMFLY_API_KEY missing');await executeJob(root,receiptId,{provider:'comfly',key:process.env.COMFLY_API_KEY,
+      identity,submit:'https://ai.comfly.org/v1/images/edits?async=true',query:'https://ai.comfly.org/v1/images/tasks/',
       prepare:async()=>multipart(fields,files),taskId:r=>r.task_id || r.data?.task_id,parse:parseImage,output:`frames/${f.id}.png`});
+    } catch(error){return nativeHandoff(root,'image',f.id,refs,fields,identity,receiptId,error);}
+    await completeAttempt(root,'image',f.id);
     console.log(JSON.stringify({frame:f.id,status:'downloaded'}));
   }
 }
 export async function generateVideos(root) {
-  check(process.env.APIMART_API_KEY,'APIMART_API_KEY missing');await verifyApproval(root);
+  await verifyApproval(root);await verifyQuality(root,'frames');
   const p=await read(path.join(root,'plan.json'));check(p.tier==='basic','Only basic tier implemented');
   for(const s of p.shots) {
     await verifyApproval(root);
-    const refs=s.frame==='wide'?['frames/wide.png',...p.references]:['frames/wide.png',`frames/${s.frame}.png`,...p.references],files=await assets(root,refs);
-    const visualRoles=s.frame==='wide'
-      ? '参考图1锁定母女身份、空间关系与全景构图；后续商品图锁定商品外观。'
-      : '参考图1锁定同一母女、场景和左右关系；参考图2锁定本镜头的商品取景；后续商品图锁定商品实际外观。';
-    const fields={model:p.video_model,prompt:visualRoles+'\n'+s.prompt+'\n原生中文对白，逐字说：'+s.dialogue+'\n不要字幕、水印、背景音乐或新增人物。',duration:s.generation_duration,size:'9:16',resolution:'720p'};
-    await executeJob(root,'video-'+s.id,{provider:'apimart',key:process.env.APIMART_API_KEY,
-      identity:{fields,refs:files.map(x=>hash(x.bytes)),approval:await read(path.join(root,'approval.json'))},
+    const anchor=p.scene_anchor || p.frames[0].id;
+    const refs=s.frame===anchor?[`frames/${anchor}.png`,...p.references]:[`frames/${anchor}.png`,`frames/${s.frame}.png`,...p.references],files=await assets(root,refs);
+    const visualRoles=s.frame===anchor
+      ? '参考图1锁定角色身份、空间关系与全景构图；后续商品图锁定商品外观。'
+      : '参考图1锁定同一组角色、场景和空间关系；参考图2锁定本镜头的商品取景；后续商品图锁定商品实际外观。';
+    // Permission is checked above; an unrelated frame's reapproval must not invalidate this shot's media inputs.
+    const fields={model:p.video_model,prompt:visualRoles+'\n'+s.prompt+'\n原生中文对白，逐字说：'+s.dialogue+'\n不要字幕、水印、背景音乐或新增人物。',duration:s.generation_duration,size:p.aspect_ratio || '9:16',resolution:p.video_resolution || '720p'},identity={fields,refs:files.map(x=>hash(x.bytes))},receiptId=await jobId(root,'video',s.id);
+    if(await done(root,receiptId,identity,`clips/${s.id}.mp4`)){await completeAttempt(root,'video',s.id);continue;}
+    try {check(process.env.APIMART_API_KEY,'APIMART_API_KEY missing');await executeJob(root,receiptId,{provider:'apimart',key:process.env.APIMART_API_KEY,
+      identity,
       submit:'https://api.apimart.ai/v1/videos/generations',query:'https://api.apimart.ai/v1/tasks/',
       prepare:async()=>{
         const urls=[];
@@ -124,6 +146,8 @@ export async function generateVideos(root) {
         await verifyApproval(root);
         return {body:Buffer.from(JSON.stringify({...fields,image_urls:urls})),contentType:'application/json'};
       },taskId:r=>r.data?.[0]?.task_id,parse:parseVideo,output:`clips/${s.id}.mp4`});
+    }catch(error){return nativeHandoff(root,'video',s.id,refs,fields,identity,receiptId,error);}
+    await completeAttempt(root,'video',s.id);
     console.log(JSON.stringify({shot:s.id,status:'downloaded'}));
   }
 }

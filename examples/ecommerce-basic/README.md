@@ -10,7 +10,8 @@ For an optional one-question-at-a-time selling-point interview, run
 `hypit ecommerce grill product.json` before planning; see the guide for answer and review steps.
 At assembly, point `edit.json` at a `music_library` folder to draw one song per product run.
 The sample's cardigan adapts lower-body product shots to upper-body framing and hand gestures.
-Other categories need reviewed focus maps and product-appropriate prompt masters.
+The narrative is reusable across products: adapt role actions, proof shots and dialogue slots;
+category maps are optional presets. Use `ecommerce adapt` to find missing adaptation information.
 
 `analysis.json` separates source visual-cut candidates from speech-led generation boundaries.
 The first prototype uses ASR-derived speech boundaries to avoid splitting words across generated

@@ -48,7 +48,10 @@ test('category mapping moves all frame and motion focus to upper body',async()=>
  assert.equal(p.frames[0].prompt,'上半身 展示门襟');assert.equal(p.shots[0].prompt,p.frames[0].prompt);
  assert.equal(p.shots[0].generation_duration,6);assert.equal(p.shots[0].target_duration,2);
  const product=await read(path.join(root,'product.json'));product.category='unsupported';await save(path.join(root,'product.json'),product);
- await assert.rejects(createPlan(path.join(root,'template.json'),path.join(root,'product.json'),path.join(root,'bad')),/Unsupported/);
+ await assert.rejects(createPlan(path.join(root,'template.json'),path.join(root,'product.json'),path.join(root,'bad')),/Missing slot/);
+ product.adaptation={reviewed:true,slots:{focus:'手持商品',action:'展示包装'}};await save(path.join(root,'product.json'),product);
+ const adapted=await createPlan(path.join(root,'template.json'),path.join(root,'product.json'),path.join(root,'adapted'));
+ assert.equal(adapted.frames[0].prompt,'手持商品 展示包装');assert.equal(adapted.image_size,'4K');
  await fs.rm(root,{recursive:true});
 });
 test('resume known receipt downloads without submitting again',async()=>{

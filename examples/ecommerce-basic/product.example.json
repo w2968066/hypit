@@ -1,7 +1,10 @@
 {
   "id": "cardigan",
   "category": "cardigan",
-  "image_size": "2K",
+  "image_size": "4K",
+  "quality_check": {
+    "enabled": true
+  },
   "references": [
     "reference.png"
   ],
@@ -13,6 +16,11 @@
     "visible_appeal": "菱格好看还好搭",
     "detail_dialogue": "领口一排扣子，菱格花纹清楚，袖口也是收口的。",
     "matching_item": "条白色长裤",
-    "setting": "温馨的浅奶油色客厅，左侧窗户有薄纱帘，浅木地板，右侧沙发后面是浅色墙和一幅小装饰画，窗光柔和。保持真实日常居家感"
+    "setting": "温馨的浅奶油色客厅，左侧窗户有薄纱帘，浅木地板，右侧沙发后面是浅色墙和一幅小装饰画，窗光柔和。保持真实日常居家感",
+    "hook_dialogue": "妈，我同学问我这开衫在哪儿买的，她也想买一件。",
+    "explanation_dialogue": "这是开学给你买的，这款菱格针织开衫，难怪你同学会看上。",
+    "social_proof_dialogue": "菱格好看还好搭，班里好多女生都在找这种。",
+    "daily_payoff_dialogue": "我早上随便搭条白色长裤就可以出门上学了，穿搭挺省事的。",
+    "matching_outfit": "搭配参考图片中的白色长裤和白鞋"
   }
 }

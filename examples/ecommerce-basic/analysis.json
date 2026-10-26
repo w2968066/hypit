@@ -1,7 +1,7 @@
 {
   "schema": "hypit.ecommerce.template.v1",
   "id": "mother-daughter-link",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "tier": "basic",
   "reviewed": true,
   "analysis_status": {
@@ -17,8 +17,8 @@
     11.733333
   ],
   "physical_anchors": [
-    "母亲始终坐在画面右侧沙发上，身体接触坐垫，双脚落地",
-    "女儿站在左侧，与母亲自然对视"
+    "配角保持右侧沙发坐姿，身体接触坐垫，双脚有地面支撑",
+    "主角在左侧，与配角自然对视"
   ],
   "categories": {
     "cardigan": {
@@ -37,7 +37,7 @@
   "frames": [
     {
       "id": "wide",
-      "prompt": "A photograph captured as a single frame from a video actually shot on an iPhone, with the texture of real iPhone footage. The image looks real, without an oily, overprocessed finish. The background is clearly visible, with no depth-of-field blur. Skin texture is natural and fine, and the lighting is natural. The image is coherent and free of visual artifacts.\n参考拼图提供同一个女儿的脸、发型、商品和穿搭，不要把拼图边框复制到成片。保留女儿的脸型、长黑发与白色发夹，双眼自然睁开。{{product_description}}，搭配参考中的白色长裤和白鞋。生成单张真实家庭短视频全景：女儿站在左侧，身体略朝右，与右侧坐着的妈妈对话。妈妈是新设计的成年女性，棕色齐肩短发，浅橄榄绿衬衫、米色长裤，面容与女儿不同，坐在浅米色布艺沙发上，双脚落地，手拿手机并抬头看女儿。{{setting}}。画面中仅这两人；全身入镜，正常儿童身体比例，商品如参考。没有文字、拼接边框、贴片或商标水印。"
+      "prompt": "A photograph captured as a single frame from a video actually shot on an iPhone, with natural skin and background details.\n参考图片提供角色和商品真实外观，不复制拼图边框。{{lead_identity}}。{{product_description}}。{{matching_outfit}}。主角在画面左侧，配角在右侧沙发上坐稳，手拿手机看向主角。{{support_identity}}。{{setting}}。角色关系为{{lead_role}}与{{support_role}}，全景展示人物、商品和使用场景。只有这两人，符合年龄的自然身体比例。无文字或水印。"
     },
     {
       "id": "medium",
@@ -57,7 +57,7 @@
       "end": 2.9,
       "frame": "wide",
       "speaker": "女儿",
-      "dialogue": "妈，我同学问我这{{product_short}}在哪儿买的，她也想买一{{unit}}。",
+      "dialogue": "{{hook_dialogue}}",
       "prompt": "女儿站在左侧，带着开心又好奇的神情问右侧坐着的妈妈。妈妈抬头听，不抢话。女儿使用自然明亮的女孩普通话音色，妈妈使用温和的成年女性普通话。保持参考图身份与房间。女儿整句尽量在前2.9秒自然快速说完，其后安静停留。"
     },
     {
@@ -66,7 +66,7 @@
       "end": 6.62,
       "frame": "medium",
       "speaker": "母亲（画外音）",
-      "dialogue": "这是开学给你买的，{{product_intro}}，难怪你同学会看上。",
+      "dialogue": "{{explanation_dialogue}}",
       "prompt": "{{overall_focus}}。{{show_action}}。右侧妈妈温和地回答，使用成年女性普通话；取景聚焦商品，女儿听着不说话。整句尽量在前3.72秒自然快速说完，其后安静停留。"
     },
     {
@@ -75,7 +75,7 @@
       "end": 9.14,
       "frame": "wide",
       "speaker": "女儿",
-      "dialogue": "{{visible_appeal}}，班里好多女生都在找这种。",
+      "dialogue": "{{social_proof_dialogue}}",
       "prompt": "母女同框，女儿带一点开心的小得意，向妈妈分享同学的反应，母亲微笑听。女儿使用与开场一致的自然明亮女孩普通话音色，整句尽量在前2.52秒说完，其后安静停留。"
     },
     {
@@ -93,8 +93,22 @@
       "end": 14.953651,
       "frame": "wide",
       "speaker": "女儿",
-      "dialogue": "我早上随便搭{{matching_item}}就可以出门上学了，穿搭挺省事的。",
+      "dialogue": "{{daily_payoff_dialogue}}",
       "prompt": "母女同框，女儿轻轻示意整套穿搭，然后看向妈妈笑，母亲自然回应微笑。女儿保持开场的自然明亮女孩普通话音色，整句尽量在前3.13秒说完，其后安静停留。"
     }
-  ]
+  ],
+  "narrative": {
+    "hook": "同伴注意到商品并主动问来源",
+    "explanation": "熟悉的人解释购买原因",
+    "social_proof": "主角分享同伴兴趣",
+    "evidence": "展示商品本身可观察的细节",
+    "payoff": "回到日常使用的方便或愉悦"
+  },
+  "defaults": {
+    "lead_role": "女儿",
+    "support_role": "妈妈",
+    "lead_identity": "主角的脸、发型和年龄表现以用户角色卡为准",
+    "support_identity": "新设计的成年女性配角，外貌不同于参考视频中的人物",
+    "matching_outfit": "其余穿搭符合用户角色卡和日常场景，不喧宾夺主"
+  }
 }
