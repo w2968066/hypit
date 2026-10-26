@@ -6,6 +6,9 @@ intentionally not committed.
 
 Place your approved reference image at `reference.png` and copy `product.example.json`
 to `product.json` in a product directory. Edit factual slots to match your actual product.
+For an optional one-question-at-a-time selling-point interview, run
+`hypit ecommerce grill product.json` before planning; see the guide for answer and review steps.
+At assembly, point `edit.json` at a `music_library` folder to draw one song per product run.
 The sample's cardigan adapts lower-body product shots to upper-body framing and hand gestures.
 Other categories need reviewed focus maps and product-appropriate prompt masters.
 

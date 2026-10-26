@@ -42,6 +42,29 @@ Each product folder supplies `product.json`, image files and factual text slots.
 `examples/ecommerce-basic/product.example.json` as the input shape. It contains no credentials.
 No runtime model is asked to invent fabric composition or performance claims.
 
+### Optional product grill before planning
+
+For a product whose selling points are still unclear, run `grill` before `plan`:
+
+```sh
+node bin/hypit.mjs ecommerce grill products/item/product.json
+node bin/hypit.mjs ecommerce grill-answer products/item/product.json "your answer to the current question"
+# Repeat until the command returns needs_review.
+# Revise an earlier answer if needed: grill-answer product.json "better answer" visual_proof
+# Map the confirmed points into product.json slots, show the summary to the user, then:
+node bin/hypit.mjs ecommerce grill-approve products/item/product.json "user reviewed the selling points and script slots"
+```
+
+This turns on `grill_mode` for that product and saves resumable answers in
+`product.grill.json`. It asks one question at a time about buyer, reason to ask for the link,
+ranked benefits, evidence, visible details, objections, dialogue and forbidden claims.
+The agent should probe vague answers before recording them, distinguish visible facts from
+unsupported promises, and review the resulting slot wording with the user. If the product
+changes after approval, `plan` requires another grill review. Products without grill mode
+follow the existing flow. The interview belongs to template/product preparation; no model
+interview runs inside paid image or video production. See the
+[agent interview guide](ecommerce-product-grill.md).
+
 Set `COMFLY_API_KEY` and `APIMART_API_KEY` in the process environment using a secure local
 credential mechanism. Do not put keys in manifests, prompt files, CLI arguments, Git or logs.
 
@@ -82,13 +105,21 @@ After watching and listening, supply `edit.json`:
   "shots": [
     {"id": "s1", "start": 0, "dialogue_complete": true}
   ],
-  "music": {"path": "music/instrumental.wav", "reviewed_music_only": true, "gain": 0.15}
+  "music_library": {"path": "D:/MusicLibrary", "gain": 0.18}
 }
 ```
 
 List every shot in plan order. `start` is a trim offset into the generated clip. Duration
-comes from the plan. `music` is optional; the original mixed dialogue track is never reused as
-music automatically. Separate and listen to any extracted music before marking it reviewed.
+comes from the plan. `music_library` is optional and may point outside the run; a relative path
+is resolved from `edit.json`. The command picks one supported audio file from the folder for
+each run, copies it into `assembly/`, and records the choice in `assembly/music-selection.json`.
+Reassembling the same run reuses that copy. Supported types are MP3, WAV, M4A, AAC, FLAC,
+OGG and OPUS. Short tracks loop under the dialogue. You can set
+`HYPIT_ECOMMERCE_MUSIC_LIBRARY` as a default folder instead, or keep using the older single
+track `music: {"path":"music/instrumental.wav","reviewed_music_only":true,"gain":0.15}`.
+The repo includes an ignored `music-library/` folder for personal tracks.
+The original mixed dialogue track is never reused as music automatically. Separate and
+listen to any extracted music before marking it reviewed.
 
 ```sh
 node bin/hypit.mjs ecommerce assemble new-run edit.json

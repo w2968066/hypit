@@ -1,10 +1,47 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {compile,createPlan,read,save,approve,withLock,check,media,fileAt,verifyApproval} from '../scripts/ecommerce/core.mjs';
 import {generateFrames,generateVideos} from '../scripts/ecommerce/providers.mjs';
+import {grill,approveGrill} from '../scripts/ecommerce/grill.mjs';
 
 const escape = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const musicExtensions = new Set(['.mp3','.wav','.m4a','.aac','.flac','.ogg','.opus']);
+async function musicForAssembly(root, edit, editFile) {
+  check(!(edit.music && edit.music_library), 'Choose either music or music_library');
+  if(edit.music) {
+    check(edit.music.reviewed_music_only===true,'Original mixed audio cannot be treated as music');
+    const gain=edit.music.gain ?? 0.15;check(Number.isFinite(gain)&&gain>=0&&gain<=1,'Invalid music gain');
+    return {file:fileAt(root,edit.music.path),gain,source:'single-track'};
+  }
+  const config=edit.music_library || (process.env.HYPIT_ECOMMERCE_MUSIC_LIBRARY ? {path:process.env.HYPIT_ECOMMERCE_MUSIC_LIBRARY} : null);
+  if(!config)return null;
+  check(typeof config.path==='string' && config.path.trim(),'Music library path required');
+  const gain=config.gain ?? 0.18;check(Number.isFinite(gain)&&gain>=0&&gain<=1,'Invalid music gain');
+  const folder=path.resolve(path.dirname(path.resolve(editFile)),config.path);
+  check((await fs.stat(folder).catch(()=>null))?.isDirectory(),`Music library folder missing: ${folder}`);
+  const receiptFile=path.join(root,'assembly','music-selection.json');
+  const previous=await read(receiptFile).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+  if(previous) {
+    check(previous.library===folder,'Music library changed for this run; use a new run for a new selection');
+    const copy=fileAt(root,previous.copy);
+    check((await fs.stat(copy).catch(()=>null))?.isFile(),'Selected music copy missing');
+    check(crypto.createHash('sha256').update(await fs.readFile(copy)).digest('hex')===previous.sha256,'Selected music copy changed');
+    return {file:copy,gain,source:'library',selection:previous};
+  }
+  const entries=(await fs.readdir(folder,{withFileTypes:true}))
+    .filter(entry=>entry.isFile() && musicExtensions.has(path.extname(entry.name).toLowerCase()))
+    .map(entry=>entry.name).sort();
+  check(entries.length>0,`Music library has no supported audio files: ${folder}`);
+  const chosen=entries[crypto.randomInt(entries.length)];
+  const source=path.join(folder,chosen), copyRelative=`assembly/selected-music${path.extname(chosen).toLowerCase()}`;
+  const copy=fileAt(root,copyRelative);
+  await fs.copyFile(source,copy);
+  const selection={library:folder,chosen,copy:copyRelative,sha256:crypto.createHash('sha256').update(await fs.readFile(copy)).digest('hex'),selected_at:new Date().toISOString()};
+  await save(receiptFile,selection);
+  return {file:copy,gain,source:'library',selection};
+}
 async function review(root) {
   const p=await read(path.join(root,'plan.json'));
   const cards=(await Promise.all(p.frames.map(async f=>{
@@ -33,17 +70,20 @@ async function assemble(root, editFile) {
   }
   await fs.writeFile(path.join(root,'assembly','concat.txt'),inputs.join('\n'));
   media(['-y','-f','concat','-safe','0','-i',path.join(root,'assembly','concat.txt'),'-c','copy',path.join(root,'assembly','dialogue.mp4')]);
-  if(edit.music) {
-    check(edit.music.reviewed_music_only===true,'Original mixed audio cannot be treated as music');
-    const gain=edit.music.gain ?? 0.15;check(Number.isFinite(gain)&&gain>=0&&gain<=1,'Invalid music gain');
-    media(['-y','-i',path.join(root,'assembly','dialogue.mp4'),'-stream_loop','-1','-i',fileAt(root,edit.music.path),'-filter_complex',`[1:a]volume=${gain}[m];[0:a][m]amix=inputs=2:duration=first:normalize=0[a]`,'-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-shortest',path.join(root,'final.mp4')]);
+  const music=await musicForAssembly(root,edit,editFile);
+  if(music) {
+    const musicEnd=p.shots.reduce((seconds,shot)=>seconds+shot.target_duration,0);
+    media(['-y','-i',path.join(root,'assembly','dialogue.mp4'),'-stream_loop','-1','-i',music.file,'-filter_complex',`[1:a]volume=${music.gain},afade=t=in:st=0:d=0.25,afade=t=out:st=${Math.max(0,musicEnd-0.6)}:d=0.6[m];[0:a][m]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[a]`,'-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-shortest',path.join(root,'final.mp4')]);
   } else await fs.copyFile(path.join(root,'assembly','dialogue.mp4'),path.join(root,'final.mp4'));
-  return {output:path.resolve(root,'final.mp4'),music:!!edit.music};
+  return {output:path.resolve(root,'final.mp4'),music:music ? {source:music.source,chosen:music.selection?.chosen || edit.music.path} : null};
 }
 async function main() {
   const [cmd,...args]=process.argv.slice(2);
-  if(!cmd || cmd==='--help')return {commands:{compile:'compile analysis.json reference.mp4 new-template-dir',plan:'plan template.json product.json new-run-dir',batch:'batch template.json products-dir new-output-dir', 'batch-frames':'batch-frames batch-dir --submit', 'batch-approve':'batch-approve batch-dir "actual whole-batch approval evidence"', 'batch-videos':'batch-videos batch-dir --submit',frames:'frames run-dir --submit',review:'review run-dir',approve:'approve run-dir "actual human approval evidence"',videos:'videos run-dir --submit',assemble:'assemble run-dir reviewed-edit.json',status:'status run-dir'}};
+  if(!cmd || cmd==='--help')return {commands:{compile:'compile analysis.json reference.mp4 new-template-dir',grill:'grill product.json', 'grill-answer':'grill-answer product.json "answer to current question"', 'grill-approve':'grill-approve product.json "review evidence"',plan:'plan template.json product.json new-run-dir',batch:'batch template.json products-dir new-output-dir', 'batch-frames':'batch-frames batch-dir --submit', 'batch-approve':'batch-approve batch-dir "actual whole-batch approval evidence"', 'batch-videos':'batch-videos batch-dir --submit',frames:'frames run-dir --submit',review:'review run-dir',approve:'approve run-dir "actual human approval evidence"',videos:'videos run-dir --submit',assemble:'assemble run-dir reviewed-edit.json',status:'status run-dir'}};
   if(cmd==='compile')return compile(...args);
+  if(cmd==='grill')return grill(args[0]);
+  if(cmd==='grill-answer')return grill(args[0],args[1],args[2]);
+  if(cmd==='grill-approve')return approveGrill(args[0],args[1]);
   if(cmd==='plan')return createPlan(...args);
   if(cmd==='batch') {
     const [template,products,output]=args;await fs.mkdir(output,{recursive:false});const results=[];

@@ -69,6 +69,14 @@ export async function createPlan(templateFile, productFile, destination) {
   check(Object.hasOwn(t.categories,p.category), `Unsupported product category: ${p.category}`);
   check(p.slots && typeof p.slots==='object' && Array.isArray(p.references) && p.references.length, 'Product slots/references required');
   check(!('apiKey' in p) && !('key' in p), 'Keys belong in environment, never product JSON');
+  let grillBrief=null;
+  if(p.grill_mode===true) {
+    const session=await read(path.join(path.dirname(productFile),'product.grill.json'));
+    check(session.schema==='hypit.ecommerce.grill.v1' && session.product_id===p.id && session.reviewed===true && session.evidence,
+      'Grill interview is not reviewed');
+    check(session.product_sha256===hash(await fs.readFile(productFile)),'Product changed after grill review; review the mapped selling points again');
+    grillBrief={answers:session.answers,evidence:session.evidence,digest:hash(JSON.stringify(session))};
+  }
   const variables={...p.slots,...t.categories[p.category]};
   const frames=t.frames.map(f=>({...f,prompt:render(f.prompt,variables)}));
   const shots=t.shots.map(s=>({...s,prompt:render(s.prompt,variables),dialogue:render(s.dialogue,variables),
@@ -84,7 +92,7 @@ export async function createPlan(templateFile, productFile, destination) {
   check(references.length<=6,'At most six product references; one slot reserved for scene');
   const plan={schema:'hypit.ecommerce.plan.v1',tier:'basic',template:{id:t.id,version:t.version,digest:hash(JSON.stringify(t))},
     product:p.id,category:p.category,image_model:'gemini-nano-banana-2.1',image_size:p.image_size || '2K',video_model:'grok-imagine-1.5-video-ext',
-    references,frames,shots,music:{status:'needs_separation_review'},limits:{image_tasks:frames.length,video_tasks:shots.length},
+    references,frames,shots,music:{status:'needs_separation_review'},grill:grillBrief,limits:{image_tasks:frames.length,video_tasks:shots.length},
     caveats:['No reference-video input in basic tier','Voice and timing require output review','Generated clips are at least 6s; reviewed trims required']};
   check(['1K','2K','4K'].includes(plan.image_size),'Invalid image size');
   await save(path.join(destination,'plan.json'),plan); return plan;
