@@ -107,8 +107,11 @@ export async function generateVideos(root) {
   const p=await read(path.join(root,'plan.json'));check(p.tier==='basic','Only basic tier implemented');
   for(const s of p.shots) {
     await verifyApproval(root);
-    const refs=[`frames/${s.frame}.png`,...p.references],files=await assets(root,refs);
-    const fields={model:p.video_model,prompt:s.prompt+'\n原生中文对白，逐字说：'+s.dialogue+'\n不要字幕、水印、音乐或新增人物。',duration:s.generation_duration,size:'9:16',resolution:'720p'};
+    const refs=s.frame==='wide'?['frames/wide.png',...p.references]:['frames/wide.png',`frames/${s.frame}.png`,...p.references],files=await assets(root,refs);
+    const visualRoles=s.frame==='wide'
+      ? '参考图1锁定母女身份、空间关系与全景构图；后续商品图锁定商品外观。'
+      : '参考图1锁定同一母女、场景和左右关系；参考图2锁定本镜头的商品取景；后续商品图锁定商品实际外观。';
+    const fields={model:p.video_model,prompt:visualRoles+'\n'+s.prompt+'\n原生中文对白，逐字说：'+s.dialogue+'\n不要字幕、水印、背景音乐或新增人物。',duration:s.generation_duration,size:'9:16',resolution:'720p'};
     await executeJob(root,'video-'+s.id,{provider:'apimart',key:process.env.APIMART_API_KEY,
       identity:{fields,refs:files.map(x=>hash(x.bytes)),approval:await read(path.join(root,'approval.json'))},
       submit:'https://api.apimart.ai/v1/videos/generations',query:'https://api.apimart.ai/v1/tasks/',
