@@ -76,6 +76,11 @@ product facts in `product.json.facts`; template-specific phrasing belongs in `sl
 
 Set `COMFLY_API_KEY` and `APIMART_API_KEY` in the process environment using a secure local
 credential mechanism. Do not put keys in manifests, prompt files, CLI arguments, Git or logs.
+`APIMART_BASE_URL` configures one APIMart origin for image upload, video submission and task
+polling together. The source default is `https://api.apimart.ai`; the internal handoff uses
+`https://api.apib.ai`, read from the user's current ecvideo production provider configuration.
+That same key and previous task were verified through the latter host. No DNS/IP pinning or
+TLS-verification downgrade is used. New job receipts preserve their original query endpoint.
 
 ```sh
 # Paid: only after the user has authorized the planned image scope.

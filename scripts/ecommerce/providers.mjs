@@ -6,6 +6,13 @@ import {check,hash,read,save,fileAt,verifyApproval} from './core.mjs';
 import {jobId,completeAttempt} from './attempts.mjs';
 import {verifyQuality} from './quality.mjs';
 
+export function apimartEndpoints(base=process.env.APIMART_BASE_URL || 'https://api.apimart.ai') {
+  let url;try{url=new URL(base.trim());}catch{throw new Error('Invalid APIMART_BASE_URL');}
+  check(url.protocol==='https:'&&!url.username&&!url.password&&!url.search&&!url.hash,'APIMART_BASE_URL must be HTTPS without credentials or query parameters');
+  const root=url.origin+url.pathname.replace(/\/+$/,'').replace(/\/v1$/,'');
+  return {base:root,upload:root+'/v1/uploads/images',submit:root+'/v1/videos/generations',query:root+'/v1/tasks/',tokenBalance:root+'/v1/balance',accountBalance:root+'/v1/user/balance'};
+}
+
 export function request(url,{method='GET',key,body,contentType,timeout=600000,binary=false}={}) {
   check(new URL(url).protocol==='https:','HTTPS required');
   return new Promise((resolve,reject)=>{
@@ -62,7 +69,7 @@ export async function executeJob(root,id,spec,transport=request) {
   } else {
     // Prepare uploads first. No billable POST has occurred if preparation fails.
     const submitOptions=await spec.prepare();
-    receipt={digest,status:'submitting',at:new Date().toISOString(),provider:spec.provider};
+    receipt={digest,status:'submitting',at:new Date().toISOString(),provider:spec.provider,submit_url:spec.submit,query_url:spec.query};
     await save(receiptFile,receipt);
     let response;
     try {response=await transport(spec.submit,{...submitOptions,method:'POST',key:spec.key});}
@@ -74,7 +81,7 @@ export async function executeJob(root,id,spec,transport=request) {
   // Bounded polling is deterministic, not an agent loop. A timeout resumes the same receipt.
   const deadline=Date.now()+1200000;
   while(Date.now()<deadline) {
-    const response=await transport(spec.query+encodeURIComponent(receipt.task_id),{key:spec.key,timeout:120000});
+    const response=await transport((receipt.query_url || spec.query)+encodeURIComponent(receipt.task_id),{key:spec.key,timeout:120000});
     const status=spec.parse(response);receipt.status=status.status;
     if(status.reason)receipt.reason=status.reason;
     await save(receiptFile,receipt);
@@ -124,6 +131,7 @@ export async function generateFrames(root) {
 export async function generateVideos(root) {
   await verifyApproval(root);await verifyQuality(root,'frames');
   const p=await read(path.join(root,'plan.json'));check(p.tier==='basic','Only basic tier implemented');
+  const endpoints=apimartEndpoints();
   for(const s of p.shots) {
     await verifyApproval(root);
     const anchor=p.scene_anchor || p.frames[0].id;
@@ -137,11 +145,11 @@ export async function generateVideos(root) {
     if(await done(root,receiptId,identity,`clips/${s.id}.mp4`)){await completeAttempt(root,'video',s.id);continue;}
     try {check(process.env.APIMART_API_KEY,'APIMART_API_KEY missing');await executeJob(root,receiptId,{provider:'apimart',key:process.env.APIMART_API_KEY,
       identity,
-      submit:'https://api.apimart.ai/v1/videos/generations',query:'https://api.apimart.ai/v1/tasks/',
+      submit:endpoints.submit,query:endpoints.query,
       prepare:async()=>{
         const urls=[];
         for(const file of files) {
-          const response=await request('https://api.apimart.ai/v1/uploads/images',{method:'POST',key:process.env.APIMART_API_KEY,...multipart({},[{...file,field:'file'}])});
+          const response=await request(endpoints.upload,{method:'POST',key:process.env.APIMART_API_KEY,...multipart({},[{...file,field:'file'}])});
           check(typeof response.url==='string' && response.url.startsWith('https://'),'Unknown upload response');urls.push(response.url);
         }
         await verifyApproval(root);

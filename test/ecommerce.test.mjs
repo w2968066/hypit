@@ -6,12 +6,17 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {render,validateTemplate,fileAt,save,approve,verifyApproval,withLock,createPlan,read} from '../scripts/ecommerce/core.mjs';
-import {parseImage,parseVideo,executeJob,multipart} from '../scripts/ecommerce/providers.mjs';
+import {parseImage,parseVideo,executeJob,multipart,apimartEndpoints} from '../scripts/ecommerce/providers.mjs';
 
 test('slots are required and substitution does not recursively interpolate product text',()=>{
  assert.equal(render('拍{{focus}}',{focus:'上半身{{other}}'}),'拍上半身{{other}}');assert.throws(()=>render('{{missing}}',{}));
 });
 test('asset traversal rejected',()=>{assert.throws(()=>fileAt('/tmp/project','../secret'));});
+test('APIMart configured base applies to upload, submit, poll and diagnostics without duplicate v1',()=>{
+ const e=apimartEndpoints('https://api.apib.ai/v1/');
+ assert.equal(e.base,'https://api.apib.ai');assert.equal(e.upload,'https://api.apib.ai/v1/uploads/images');assert.equal(e.submit,'https://api.apib.ai/v1/videos/generations');assert.equal(e.query,'https://api.apib.ai/v1/tasks/');assert.equal(e.tokenBalance,'https://api.apib.ai/v1/balance');
+ assert.throws(()=>apimartEndpoints('http://api.apib.ai'));assert.throws(()=>apimartEndpoints('https://user:secret@api.apib.ai'));assert.throws(()=>apimartEndpoints('https://api.apib.ai?token=bad'));
+});
 test('unknown tier is not silently downgraded',()=>{assert.throws(()=>validateTemplate({schema:'hypit.ecommerce.template.v1',id:'demo',version:'1',tier:'advanced'}));});
 test('provider success requires actual media URL',()=>{
  assert.throws(()=>parseImage({data:{status:'SUCCESS'}}));assert.throws(()=>parseVideo({data:{status:'completed',result:{}}}));
@@ -60,6 +65,14 @@ test('resume known receipt downloads without submitting again',async()=>{
  const spec={identity:{model:'test'},provider:'comfly',prepare:async()=>({}),submit:'https://example.com/submit',query:'https://example.com/task/',output:'frames/a.png',taskId:r=>r.id,parse:parseImage};
  const transport=async(url,options)=>{if(options.method==='POST'){posts++;return {id:'abc'};}if(options.binary)return bytes;return {data:{status:'SUCCESS',data:{data:[{url:'https://example.com/output'}]}}};};
  await executeJob(root,'test',spec,transport);await fs.unlink(path.join(root,'frames/a.png'));await executeJob(root,'test',spec,transport);assert.equal(posts,1);await fs.rm(root,{recursive:true});
+});
+test('known task keeps its recorded query route when later configuration changes',async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'hypit-ecommerce-'));let posts=0;const queries=[];
+ const bytes=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(120)]);
+ const spec={identity:{model:'test'},provider:'comfly',prepare:async()=>({}),submit:'https://example.com/submit',query:'https://example.com/old-task/',output:'frames/a.png',taskId:r=>r.id,parse:parseImage};
+ const transport=async(url,options)=>{if(options.method==='POST'){posts++;return {id:'abc'};}if(options.binary)return bytes;queries.push(url);return {data:{status:'SUCCESS',data:{data:[{url:'https://example.com/output'}]}}};};
+ await executeJob(root,'route',spec,transport);await fs.unlink(path.join(root,'frames/a.png'));await executeJob(root,'route',{...spec,query:'https://example.com/new-task/'},transport);
+ assert.equal(posts,1);assert.deepEqual(queries,['https://example.com/old-task/abc','https://example.com/old-task/abc']);await fs.rm(root,{recursive:true});
 });
 test('main hypit entry exposes ecommerce without TypeScript runtime setup',()=>{
  const entry=fileURLToPath(new URL('../bin/hypit.mjs',import.meta.url));
