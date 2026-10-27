@@ -3,9 +3,10 @@
 These are the user's accepted operating choices. Carry them into future agent sessions.
 
 - Personal use through an agent and this fork; no ecvideo account/billing integration now.
-- Image API first: Comfly Nano Banana 2.1, default 4K. Video API first: APIMart Grok basic,
+- Ask API versus native separately for images and videos before first production; reuse settled
+  choices. If API is chosen: Comfly Nano Banana 2.1, default 4K; APIMart Grok basic,
   default 720p and 9:16. Keep basic and future reference-video advanced routes distinct.
-- Use native image/video generation as a fallback only when the calling environment actually
+- Use native image/video generation as a fallback only when the user explicitly allows it and the calling environment actually
   exposes that capability. Report actual output dimensions; native image generation may not
   meet a 4K request. A native video tool is not assumed to exist.
 - A template owns a general narrative: curiosity about origin, explanation, peer interest,
@@ -42,3 +43,10 @@ The mother–daughter cardigan sample established these practical lessons:
    repeat facts the user has already clarified.
 8. A test ended after the first interview answer. Keep partial facts as draft information;
    stopping a test is not confirmation of unanswered selling points or final approval.
+
+New production decisions: first-use optional grill reminder; a finite product×template×repeat
+matrix; upfront unattended authorization; script-only API production with visual checks explicitly
+off; real hook capability checks when native/model inspection is selected; persistent call caps,
+STOP boundaries, receipt-safe resume, failure isolation and product-folder exports. Local ASR
+checks content coverage and sentence endings before automatic caption/trim approval. This is
+a machine policy, not a fabricated human review. See ecommerce-unattended.md for limits.

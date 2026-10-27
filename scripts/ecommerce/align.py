@@ -1,5 +1,4 @@
 """Finite local ASR alignment; outputs draft timings for review, never claimed approval."""
-import difflib
 import json
 import os
 from pathlib import Path
@@ -8,10 +7,7 @@ import subprocess
 import sys
 
 from faster_whisper import WhisperModel
-
-
-def normalized(text):
-    return ''.join(c for c in text if c.isalnum())
+from speech import normalized, compare_speech
 
 
 def clauses(text):
@@ -39,6 +35,9 @@ def main():
     model = WhisperModel(os.environ.get('HYPIT_ECOMMERCE_ASR_MODEL', 'base'), device='cpu', compute_type='int8')
     cues, transcripts, offset = [], [], 0.0
     for shot in request['shots']:
+        if not shot['dialogue'].strip():
+            offset += shot['duration']
+            continue
         wave = destination.parent / (shot['id'] + '.wav')
         subprocess.run([os.environ.get('HYPIT_ECOMMERCE_FFMPEG', 'ffmpeg'), '-y', '-hide_banner', '-loglevel', 'error', '-ss', str(shot['start']), '-i', shot['file'], '-t', str(shot['duration']), '-vn', '-ar', '16000', '-ac', '1', str(wave)], check=True)
         segments, _ = model.transcribe(str(wave), language='zh', word_timestamps=True, vad_filter=False)
@@ -54,7 +53,7 @@ def main():
         if not timings:
             raise RuntimeError('No speech found in ' + shot['id'] + '; review the actual clip')
         authored = normalized(shot['dialogue'])
-        matcher = difflib.SequenceMatcher(None, authored, recognized, autojunk=False)
+        matcher, metrics = compare_speech(authored, recognized)
         mapping = {}
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
             for i in range(i1, i2):
@@ -68,10 +67,12 @@ def main():
             end = min(shot['duration'], timings[mapping.get(cursor+length-1, len(timings)-1)][1])
             if end <= start:
                 raise RuntimeError('Unreliable cue timings in ' + shot['id'] + '; review manually')
-            cues.append({'start': round(offset+start, 3), 'end': round(offset+end, 3), 'text': text})
+            cues.append({'shot_id': shot['id'], 'start': round(offset+start, 3), 'end': round(offset+end, 3), 'text': text})
             cursor += length
             previous = end
-        transcripts.append({'id': shot['id'], 'recognized': ''.join(raw), 'authored': shot['dialogue'], 'similarity': round(matcher.ratio(), 3), 'needs_review': True})
+        transcripts.append({'id': shot['id'], 'recognized': ''.join(raw), 'authored': shot['dialogue'],
+                            **metrics,
+                            'speech_start': timings[0][0], 'speech_end': timings[-1][1], 'offset': offset, 'needs_review': True})
         offset += shot['duration']
     destination.write_text(json.dumps({'reviewed': False, 'cues': cues, 'transcripts': transcripts}, ensure_ascii=False, indent=2), encoding='utf-8')
 

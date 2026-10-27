@@ -1,0 +1,11 @@
+{
+  "schema": "hypit.ecommerce.matrix-input.v1",
+  "products_dir": "products",
+  "templates": [
+    "templates/mother-daughter-link/v0.2.0/template.json",
+    "templates/studio-motion-detail/v1.0.0/template.json"
+  ],
+  "repeat": 2,
+  "visual_check": false,
+  "music_library": {"path": "music-library", "gain": 0.18}
+}

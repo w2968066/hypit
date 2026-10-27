@@ -26,6 +26,8 @@ coverage/
 .env
 .env.*
 !.env.example
+ecommerce-settings.json
+choices.local.json
 *.key
 *.pem
 *.p12

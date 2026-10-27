@@ -318,3 +318,9 @@ commands and the repository layout.
 Hypit is released under the [Hypit Open Source License](./LICENSE). The videos and other outputs you create belong to you; third-party models and services may have their own terms.
 
 Partnership Community: [LINUX DO](https://linux.do/)
+
+## Ecommerce fork
+
+For this fork’s template-based product videos, start with [ECOMMERCE_AGENT.md](ECOMMERCE_AGENT.md).
+It covers explicit API/native selection, reusable product interviews, and a finite
+product × template × repeat unattended workflow. [Chinese setup and batch guide](docs/guide/ecommerce-unattended.md).

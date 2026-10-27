@@ -1,0 +1,9 @@
+{
+  "generation": {
+    "image": "api",
+    "video": "api",
+    "fallback": {"image": false, "video": false},
+    "evidence": "Replace with the user's actual generation choices; this example is not authorization"
+  },
+  "grill_reminder_acknowledged": true
+}

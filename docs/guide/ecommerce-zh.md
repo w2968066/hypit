@@ -1,7 +1,9 @@
 # 电商版 Hypit：给 Agent 的日常使用约定
 
-默认生图走 Comfly Nano Banana 2.1，4K；基础版视频走 APIMart Grok，720p、9:16。
-API 失败且结果明确时，Agent 检查当前是否有原生生图／生视频工具，有就接着使用。
+首次先询问生图、生视频分别使用 API 还是当前 Agent 的原生能力，并提醒可选“拷问模式”。
+已有明确选择直接复用；API 存在 token 不代表用户选择了它。选择 API 时，生图默认
+Comfly Nano Banana 2.1，4K；基础版视频 APIMart Grok，720p、9:16。
+只有明确允许原生兜底，且 API 结果已确定失败时，才检查并使用实际可用的原生工具。
 实际原生尺寸会记录；没有对应工具就说明缺少能力。不会自动把 4K 改成 2K，或把插值图当 4K。
 
 用户可以直接这样说：
@@ -67,3 +69,11 @@ node bin/hypit.mjs ecommerce videos run --submit
 
 `assemble run edit.json` 导出最终视频、字幕和交付记录；批量任务可用 `batch-assemble`。
 更多参数见 [完整说明](ecommerce-basic.md)；本次样片经验见 [固化决策](ecommerce-decisions.md)。
+
+## 多商品、多模板、无人值守
+
+使用 `matrix → matrix-check → matrix-authorize → matrix-run`。按产品×模板×重复数展开，
+一次整批授权后由脚本完成生产和归档，失败款记录报告并继续其他款。默认不自动付费重试。
+实际语音由本地 ASR 核对，字幕使用确认台词与实际时间；可选视觉检查需要真实模型接口。
+API 模式且视觉检查关闭可纯脚本运行，原生或开启检查时须先配置当前 Agent 的实际 hook。
+详见 [首次设置、全自动模式与脚本分工审查](ecommerce-unattended.md)。

@@ -34,6 +34,11 @@ production executes a fixed graph and never runs an autonomous reasoning loop.
 
 ## Local use
 
+Start with `ecommerce setup <workspace>`: ask the user to choose API or native image/video
+generation separately, mention optional product grill mode, and persist actual choices. Keys
+do not imply route consent. See [onboarding, unattended matrices and scripting audit](ecommerce-unattended.md).
+
+
 ```sh
 node bin/hypit.mjs ecommerce compile analysis.json reference.mp4 new-template
 node bin/hypit.mjs ecommerce plan new-template/template.json products/item/product.json new-run
@@ -157,7 +162,7 @@ advertised as a guarantee against platform similarity detection.
 
 ## Captions, model checks and native fallback
 
-Captions default on. `ecommerce align run-dir edit.json` runs local faster-whisper once against
+Captions default on. `ecommerce align run-dir edit.json` runs local faster-whisper (plus pypinyin for Mandarin alignment) once against
 the actual reviewed trims and writes draft ASR/timings to `alignment/captions.json`. Configure
 `HYPIT_ECOMMERCE_PYTHON` if necessary (that Python needs faster-whisper). The agent checks the
 recognized dialogue, corrects errors from the authored script and marks timings reviewed.
@@ -178,7 +183,8 @@ then save digest, stage and an item list (`id`, boolean `passed`, array `finding
 video screen for product drift, clothing/body intersections, malformed limbs and scene support;
 they are not exhaustive frame-by-frame proof. No standalone VLM API is silently called.
 
-API generation is primary. A missing API configuration or known terminal failure produces a
+Generation requires an explicit user-selected API/native route in the plan. API is not assumed.
+A selected native route, or an explicitly allowed fallback after missing API configuration or a known terminal failure, produces a
 `native_fallback_required` request with the prompt, reference paths and requested settings.
 The caller checks its current tools for native image/video generation, uses it if available,
 then runs `native-import run-dir image|video id local-file "actual generation evidence"`.

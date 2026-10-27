@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import {check,hash,read,save,fileAt,verifyApproval} from './core.mjs';
 import {jobId,completeAttempt} from './attempts.mjs';
 import {verifyQuality} from './quality.mjs';
+import {routeFor} from './settings.mjs';
 
 export function apimartEndpoints(base=process.env.APIMART_BASE_URL || 'https://api.apimart.ai') {
   let url;try{url=new URL(base.trim());}catch{throw new Error('Invalid APIMART_BASE_URL');}
@@ -69,6 +70,7 @@ export async function executeJob(root,id,spec,transport=request) {
   } else {
     // Prepare uploads first. No billable POST has occurred if preparation fails.
     const submitOptions=await spec.prepare();
+    if(spec.beforeSubmit)try{await spec.beforeSubmit();}catch(error){error.noFallback=true;throw error;}
     receipt={digest,status:'submitting',at:new Date().toISOString(),provider:spec.provider,submit_url:spec.submit,query_url:spec.query};
     await save(receiptFile,receipt);
     let response;
@@ -103,6 +105,9 @@ function mime(file){return file.endsWith('.png')?'image/png':file.endsWith('.web
 async function assets(root,refs){return Promise.all(refs.map(async(ref,i)=>({field:'image',name:`ref-${i}${path.extname(ref)}`,mime:mime(ref),bytes:await fs.readFile(fileAt(root,ref))})));}
 async function done(root,id,identity,output){const receipt=await optional(fileAt(root,`receipts/${id}.json`));return receipt?.status==='downloaded'&&receipt.digest===hash(JSON.stringify(identity))&&receipt.output_sha256===hash(await fs.readFile(fileAt(root,output)).catch(e=>{if(e.code==='ENOENT')return Buffer.alloc(0);throw e;}));}
 async function nativeHandoff(root,type,id,refs,fields,identity,receiptId,error){
+  if(error.noFallback)throw error;
+  const plan=await read(path.join(root,'plan.json')),route=routeFor(plan,type);
+  if(route!=='native' && plan.generation.fallback?.[type]!==true)throw error;
   const receipt=await optional(fileAt(root,`receipts/${receiptId}.json`));
   if(receipt && receipt.status!=='failed'){
     if(!receipt.task_id)throw new Error('API submission outcome unknown; reconcile it before native fallback or another API submission');
@@ -111,27 +116,29 @@ async function nativeHandoff(root,type,id,refs,fields,identity,receiptId,error){
   const request={schema:'hypit.ecommerce.native-request.v1',type,id,api_receipt:receiptId,digest:hash(JSON.stringify(identity)),plan_digest:hash(JSON.stringify(await read(path.join(root,'plan.json')))),reference_sha256:identity.refs,prompt:fields.prompt,references:refs.map(x=>path.resolve(root,x)),requested:fields,
     reason:String(error.message).slice(0,300),instruction:`Check the current agent tools for native ${type} generation. Use it if available, preserving references and 9:16. Otherwise report capability unavailable; never claim a generated output. Import the returned local file with native-import. Preserve the API receipt; do not auto-resubmit.`};
   const file=fileAt(root,`native-fallback/${type}-${id}.json`);await save(file,request);
-  return {status:'native_fallback_required',request:path.resolve(file),...request};
+  return {status:'native_fallback_required',route,request:path.resolve(file),...request};
 }
-export async function generateFrames(root) {
-  const p=await read(path.join(root,'plan.json'));
+export async function generateFrames(root,options={}) {
+  const p=await read(path.join(root,'plan.json')),route=routeFor(p,'image');
   for(const f of p.frames) {
     const refs=[...(f.parent?[`frames/${f.parent}.png`]:[]),...p.references];
     const files=await assets(root,refs);
     const fields={model:p.image_model,prompt:f.prompt,aspect_ratio:p.aspect_ratio || '9:16',image_size:p.image_size || '4K',response_format:'url'},identity={fields,refs:files.map(x=>hash(x.bytes))},receiptId=await jobId(root,'image',f.id);
     if(await done(root,receiptId,identity,`frames/${f.id}.png`)){await completeAttempt(root,'image',f.id);continue;}
+    if(route==='native')return nativeHandoff(root,'image',f.id,refs,fields,identity,receiptId,new Error('User selected native image generation'));
     try {check(process.env.COMFLY_API_KEY,'COMFLY_API_KEY missing');await executeJob(root,receiptId,{provider:'comfly',key:process.env.COMFLY_API_KEY,
-      identity,submit:'https://ai.comfly.org/v1/images/edits?async=true',query:'https://ai.comfly.org/v1/images/tasks/',
+      identity,beforeSubmit:()=>options.beforeSubmit?.('image',receiptId),submit:'https://ai.comfly.org/v1/images/edits?async=true',query:'https://ai.comfly.org/v1/images/tasks/',
       prepare:async()=>multipart(fields,files),taskId:r=>r.task_id || r.data?.task_id,parse:parseImage,output:`frames/${f.id}.png`});
     } catch(error){return nativeHandoff(root,'image',f.id,refs,fields,identity,receiptId,error);}
     await completeAttempt(root,'image',f.id);
     console.log(JSON.stringify({frame:f.id,status:'downloaded'}));
   }
 }
-export async function generateVideos(root) {
+export async function generateVideos(root,options={}) {
+  const route=routeFor(await read(path.join(root,'plan.json')),'video');
   await verifyApproval(root);await verifyQuality(root,'frames');
   const p=await read(path.join(root,'plan.json'));check(p.tier==='basic','Only basic tier implemented');
-  const endpoints=apimartEndpoints();
+  const endpoints=route==='api'?apimartEndpoints():null;
   for(const s of p.shots) {
     await verifyApproval(root);
     const anchor=p.scene_anchor || p.frames[0].id;
@@ -143,8 +150,9 @@ export async function generateVideos(root) {
     const speech=s.dialogue.trim()?'原生中文对白，逐字说：'+s.dialogue:'本镜头无对白、无口播、无歌唱；只表演画面动作，配乐由后期添加。';
     const fields={model:p.video_model,prompt:visualRoles+'\n'+s.prompt+'\n'+speech+'\n不要字幕、水印、背景音乐或新增人物。',duration:s.generation_duration,size:p.aspect_ratio || '9:16',resolution:p.video_resolution || '720p'},identity={fields,refs:files.map(x=>hash(x.bytes))},receiptId=await jobId(root,'video',s.id);
     if(await done(root,receiptId,identity,`clips/${s.id}.mp4`)){await completeAttempt(root,'video',s.id);continue;}
+    if(route==='native')return nativeHandoff(root,'video',s.id,refs,fields,identity,receiptId,new Error('User selected native video generation'));
     try {check(process.env.APIMART_API_KEY,'APIMART_API_KEY missing');await executeJob(root,receiptId,{provider:'apimart',key:process.env.APIMART_API_KEY,
-      identity,
+      identity,beforeSubmit:()=>options.beforeSubmit?.('video',receiptId),
       submit:endpoints.submit,query:endpoints.query,
       prepare:async()=>{
         const urls=[];
