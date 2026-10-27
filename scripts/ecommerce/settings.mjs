@@ -18,10 +18,10 @@ export async function setup(root=process.cwd(),choicesFile) {
   if(choicesFile) {
     const input=await read(choicesFile),generation=generationChoice(input.generation);
     check(input.grill_reminder_acknowledged===true,'Tell the user about optional grill mode before recording onboarding');
-    await save(path.join(root,'ecommerce-settings.json'),{schema:'hypit.ecommerce.settings.v1',generation,grill_reminder_acknowledged:true,at:new Date().toISOString()});
+    await save(path.join(root,'ecommerce-settings.json'),{...await loadSettings(root),schema:'hypit.ecommerce.settings.v1',generation,grill_reminder_acknowledged:true,at:new Date().toISOString()});
   }
   const settings=await loadSettings(root);
-  return {status:settings?'configured':'user_choice_required',settings:settings?.generation || null,
+  return {status:settings?'configured':'user_choice_required',settings:settings?.generation || null,preferences:settings?.preferences || {},
     ...(!settings?.grill_reminder_acknowledged?{reminder:grillReminder}:{}),
     questions:settings?[]:['生图使用 API 还是当前 Agent 的原生能力？','生视频使用 API 还是当前 Agent 的原生能力？','API 明确失败后是否允许使用原生能力兜底？默认不自动切换。'],
     instruction:'Ask before first production; save actual answers with setup <workspace> <choices.json>. Read existing settings on later runs; do not ask again for settled choices.'};

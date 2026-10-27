@@ -8,14 +8,14 @@ import {finishCaptions} from './finishing.mjs';
 
 const escape = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const musicExtensions = new Set(['.mp3','.wav','.m4a','.aac','.flac','.ogg','.opus']);
-async function musicForAssembly(root, edit, editFile) {
+async function musicForAssembly(root, edit, editFile, plan) {
   check(!(edit.music && edit.music_library), 'Choose either music or music_library');
   if(edit.music) {
     check(edit.music.reviewed_music_only===true,'Original mixed audio cannot be treated as music');
     const gain=edit.music.gain ?? 0.15;check(Number.isFinite(gain)&&gain>=0&&gain<=1,'Invalid music gain');
     return {file:fileAt(root,edit.music.path),gain,source:'single-track'};
   }
-  const config=edit.music_library || (process.env.HYPIT_ECOMMERCE_MUSIC_LIBRARY ? {path:process.env.HYPIT_ECOMMERCE_MUSIC_LIBRARY} : null);
+  const config=Object.hasOwn(edit,'music_library')?edit.music_library:(Object.hasOwn(plan.music || {},'library')?plan.music.library:(process.env.HYPIT_ECOMMERCE_MUSIC_LIBRARY ? {path:process.env.HYPIT_ECOMMERCE_MUSIC_LIBRARY} : null));
   if(!config)return null;
   check(typeof config.path==='string' && config.path.trim(),'Music library path required');
   const gain=config.gain ?? 0.18;check(Number.isFinite(gain)&&gain>=0&&gain<=1,'Invalid music gain');
@@ -63,7 +63,7 @@ export async function assemble(root, editFile) {
   check(edit.reviewed===true && edit.evidence,'Video trims require actual human review or an authorized automatic policy');
   check(edit.shots?.length===p.shots.length,'Every shot must have a reviewed trim');
   await fs.mkdir(path.join(root,'assembly'),{recursive:true});
-  const music=await musicForAssembly(root,edit,editFile);
+  const music=await musicForAssembly(root,edit,editFile,p);
   check(!p.music_required || music,'This music-only template requires a prepared music library or explicitly selected soundtrack');
   const inputs=[];
   for(let i=0;i<p.shots.length;i++) {

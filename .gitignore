@@ -27,6 +27,7 @@ coverage/
 .env.*
 !.env.example
 ecommerce-settings.json
+.ecommerce-onboarding.json
 choices.local.json
 *.key
 *.pem

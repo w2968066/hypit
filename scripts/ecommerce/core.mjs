@@ -75,7 +75,8 @@ export async function compile(analysisFile, source, destination) {
 export async function createPlan(templateFile, productFile, destination, options={}) {
   const t=validateTemplate(await read(templateFile)), p={...await read(productFile),...options.product};
   const {generationChoice,loadSettings}=await import('./settings.mjs');
-  const selected=options.generation || p.generation || (await loadSettings(options.workspace))?.generation;
+  const settings=await loadSettings(options.workspace),preferences=settings?.preferences || {};
+  const selected=options.generation || p.generation || settings?.generation;
   const generation=selected?generationChoice(selected):null;
   check(typeof p.id==='string' && /^[a-z0-9_-]+$/.test(p.id), 'Product ID must be portable');
   check(p.slots && typeof p.slots==='object' && Array.isArray(p.references) && p.references.length, 'Product slots/references required');
@@ -111,8 +112,8 @@ export async function createPlan(templateFile, productFile, destination, options
   }
   const plan={schema:'hypit.ecommerce.plan.v1',tier:'basic',template:{id:t.id,version:t.version,digest:hash(JSON.stringify(t))},
     product:p.id,category:p.category,image_model:'gemini-nano-banana-2.1',image_size:p.image_size || '4K',video_model:'grok-imagine-1.5-video-ext',video_resolution:'720p',aspect_ratio:'9:16',scene_anchor:p.scene_anchor || t.frames[0].id,
-    audio_mode:audioMode,music_required:audioMode==='music_only',quality_check:{enabled:p.quality_check?.enabled ?? (p.quality_check!==false)},captions:{enabled:p.captions?.enabled ?? (p.captions===false?false:t.captions?.enabled ?? audioMode==='dialogue'),safe_area:{left:42,right:145,bottom:315},font_size:38},generation,
-    references,frames,shots,music:{status:'needs_separation_review'},grill:grillBrief,limits:{image_tasks:frames.length,video_tasks:shots.length},
+    audio_mode:audioMode,music_required:audioMode==='music_only',quality_check:{enabled:p.quality_check?.enabled ?? (typeof p.quality_check==='boolean'?p.quality_check:preferences.visual_check ?? true)},captions:{enabled:p.captions?.enabled ?? (p.captions===false?false:t.captions?.enabled ?? audioMode==='dialogue'),safe_area:{left:42,right:145,bottom:315},font_size:38},generation,
+    references,frames,shots,music:{status:'user-library',...(Object.hasOwn(preferences,'music_library')?{library:preferences.music_library}:{})},grill:grillBrief,limits:{image_tasks:frames.length,video_tasks:shots.length},
     caveats:['No reference-video input in basic tier','Voice and timing require output review','Generated clips are at least 6s; reviewed trims required']};
   check(['1K','2K','4K'].includes(plan.image_size),'Invalid image size');
   await save(path.join(destination,'plan.json'),plan); return plan;

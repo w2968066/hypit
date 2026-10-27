@@ -34,7 +34,9 @@ export async function prepareMatrix(specFile,destination) {
   specFile=path.resolve(specFile);destination=path.resolve(destination);
   const spec=await read(specFile),base=path.dirname(specFile);
   check(spec.schema==='hypit.ecommerce.matrix-input.v1','Unknown matrix input schema');
-  const generation=generationChoice(spec.generation || (await loadSettings(base))?.generation);
+  const settings=await loadSettings(base),preferences=settings?.preferences || {};
+  const generation=generationChoice(spec.generation || settings?.generation);
+  const musicLibrary=Object.hasOwn(spec,'music_library')?spec.music_library:preferences.music_library;
   const repeat=spec.repeat ?? 1;check(Number.isInteger(repeat)&&repeat>=1&&repeat<=100,'Repeat must be 1–100');
   check(Array.isArray(spec.templates)&&spec.templates.length,'Templates required');
   const templates=[],templateIds=new Set();
@@ -58,10 +60,10 @@ export async function prepareMatrix(specFile,destination) {
   });
   check(products.length*templates.length*repeat<=10000,'Matrix exceeds 10,000 outputs; split into smaller batches');
   check(spec.visual_check===undefined || typeof spec.visual_check==='boolean','visual_check must be true or false');
-  const policy={mode:'unattended',visual_check:spec.visual_check!==false,
+  const policy={mode:'unattended',visual_check:spec.visual_check ?? preferences.visual_check ?? true,
     speech_similarity:spec.speech_similarity ?? 0.85,speech_coverage:spec.speech_coverage ?? 0.9,
     paid_retries:0,on_failure:'continue',concurrency:1,
-    music_library:spec.music_library?{path:path.resolve(base,spec.music_library.path),gain:spec.music_library.gain ?? 0.18}:null,
+    music_library:musicLibrary?{path:path.resolve(base,musicLibrary.path),gain:musicLibrary.gain ?? 0.18}:null,
     hook:hookSpec(spec.hook,base)};
   check(Number.isFinite(policy.speech_similarity)&&policy.speech_similarity>=0.8&&policy.speech_similarity<=1&&Number.isFinite(policy.speech_coverage)&&policy.speech_coverage>=0.85&&policy.speech_coverage<=1,'Invalid speech acceptance thresholds');
   if(policy.music_library)check(Number.isFinite(policy.music_library.gain)&&policy.music_library.gain>=0&&policy.music_library.gain<=1,'Invalid music gain');
@@ -78,6 +80,7 @@ export async function prepareMatrix(specFile,destination) {
       const variant='v'+String(i).padStart(3,'0'),relative=['runs',product.folder,template.id,variant].join('/'),run=fileAt(destination,relative);
       await fs.mkdir(path.dirname(run),{recursive:true});
       const plan=await createPlan(template.file,productFile,run,{product:overrides,generation,workspace:base});
+      plan.music.library=policy.music_library;
       plan.automation={batch_root:destination,job:relative,policy_digest:policyDigest};
       await save(path.join(run,'plan.json'),plan);
       jobs.push({id:relative,run:relative,product:plan.product,folder:product.folder,template:plan.template,variant:i,

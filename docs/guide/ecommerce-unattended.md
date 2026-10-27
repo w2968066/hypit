@@ -4,6 +4,8 @@
 
 ## 首次使用
 
+推荐使用[中文逐题引导](ecommerce-welcome.md)：`ecommerce welcome 工作目录`，由Agent一次问一题；终端可加 `--interactive`。以下 setup JSON 入口保留给已有自动化和直接配置使用。
+
 Agent 首先执行 `node bin/hypit.mjs ecommerce setup 工作目录`，把返回的问题和可选拷问模式提醒告诉用户。
 分别询问生图和生视频选 API 还是当前 Agent 的原生能力，并询问是否允许 API 明确失败后使用原生能力。**有 token 不等于用户选择了 API。** 已有明确选择则沿用，不重复询问。
 

@@ -1,5 +1,7 @@
 # 电商版 Hypit：给 Agent 的日常使用约定
 
+首次可直接说“开始首次使用引导”。Agent使用 `welcome` / `welcome-answer` 一次问一题，最后确认保存；详见[首次使用引导](ecommerce-welcome.md)。
+
 首次先询问生图、生视频分别使用 API 还是当前 Agent 的原生能力，并提醒可选“拷问模式”。
 已有明确选择直接复用；API 存在 token 不代表用户选择了它。选择 API 时，生图默认
 Comfly Nano Banana 2.1，4K；基础版视频 APIMart Grok，720p、9:16。
