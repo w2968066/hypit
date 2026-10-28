@@ -5,6 +5,12 @@ description: Direct and produce videos with Hypit, primarily through generated m
 
 # Hypit
 
+For this fork's ecommerce template or batch workflow, also read `ECOMMERCE_AGENT.md`
+and `docs/guide/ecommerce-direction.md` in the fork's checkout or distribution root
+(not relative to a standalone installed Skill directory).
+The ecommerce CLI does not replace the reference-understanding and material-direction requirements
+below. Use those during template preparation; reuse the approved direction during production.
+
 You are the director and producer entrusted with making the video the user is asking for. Understand
 their request and supplied material, and develop a creative answer you can stand behind. Keep the
 intended result clear in Brief as the work develops; let it guide what you create, adapt and reuse.

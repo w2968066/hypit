@@ -9,6 +9,7 @@ import {importNative} from './native.mjs';
 import {inspect,recordQuality,verifyQuality,probe} from './quality.mjs';
 import {alignCaptions} from './finishing.mjs';
 import {assemble} from './assembly.mjs';
+import {executionSettings,limiter,mapLimit,serial,timed,diagnostics} from './execution.mjs';
 
 const optional=async file=>read(file).catch(e=>{if(e.code==='ENOENT')return null;throw e;});
 const exists=async file=>(await fs.stat(file).catch(e=>{if(e.code==='ENOENT')return null;throw e;}))?.isFile();
@@ -62,7 +63,7 @@ export async function prepareMatrix(specFile,destination) {
   check(spec.visual_check===undefined || typeof spec.visual_check==='boolean','visual_check must be true or false');
   const policy={mode:'unattended',visual_check:spec.visual_check ?? preferences.visual_check ?? true,
     speech_similarity:spec.speech_similarity ?? 0.85,speech_coverage:spec.speech_coverage ?? 0.9,
-    paid_retries:0,on_failure:'continue',concurrency:1,
+    paid_retries:0,on_failure:'continue',execution:executionSettings(spec.execution ?? preferences.execution),
     music_library:musicLibrary?{path:path.resolve(base,musicLibrary.path),gain:musicLibrary.gain ?? 0.18}:null,
     hook:hookSpec(spec.hook,base)};
   check(Number.isFinite(policy.speech_similarity)&&policy.speech_similarity>=0.8&&policy.speech_similarity<=1&&Number.isFinite(policy.speech_coverage)&&policy.speech_coverage>=0.85&&policy.speech_coverage<=1,'Invalid speech acceptance thresholds');
@@ -73,7 +74,8 @@ export async function prepareMatrix(specFile,destination) {
     for(const product of products)for(const template of templates)for(let i=1;i<=repeat;i++) {
       // Per-template product files/adaptations are prepared once by the caller, not inferred at runtime.
       const productFile=product.variants?.[template.id]?path.resolve(path.dirname(product.file),product.variants[template.id]):product.file;
-      const data=await read(productFile),overrides={quality_check:{enabled:policy.visual_check}};
+      const data=await read(productFile),overrides={quality_check:{enabled:policy.visual_check},execution:policy.execution};
+      if(spec.fidelity!==undefined)overrides.fidelity=spec.fidelity;
       const adaptation=data.adaptations?.[template.id];
       if(adaptation)overrides.adaptation=adaptation;
       if(template.background_pool)overrides.slots={...data.slots,setting:template.background_pool[(i-1)%template.background_pool.length]};
@@ -138,12 +140,12 @@ async function invokeHook(hook,kind,payload,folder,name) {
   if(prior)throw new Error('Hook response is stale; use a new reviewed attempt');
   await save(requestFile,{schema:'hypit.ecommerce.hook-request.v1',kind,request_digest:requestDigest,payload,
     instruction:'Return {request_digest, result} to the supplied response path. For quality actually view the provided media; metadata is not a visual review. Native results require a real local file and actual generation evidence. No API keys belong in responses.'});
-  await new Promise((resolve,reject)=>{
+  await timed(path.resolve(folder,'..'),'hook:'+kind,name,()=>new Promise((resolve,reject)=>{
     const child=spawn(hook.command,[...hook.args,requestFile,responseFile],{cwd:hook.cwd,env:process.env,shell:false,stdio:'ignore',windowsHide:true});
     const timer=setTimeout(()=>{child.kill();reject(new Error('Hook timed out; inspect its task before retrying generation'));},hook.timeout_ms);
     child.once('error',()=>{clearTimeout(timer);reject(new Error('Cannot launch configured hook'));});
     child.once('exit',code=>{clearTimeout(timer);code===0?resolve():reject(new Error('Hook failed; inspect its local diagnostic output'));});
-  });
+  }));
   const result=await read(responseFile);check(result.request_digest===requestDigest && result.result,'Hook response digest/result missing');return result.result;
 }
 export async function preflightMatrix(root) {
@@ -184,6 +186,7 @@ export async function preflightMatrix(root) {
 }
 async function stopRequested(root) {return exists(path.join(root,'STOP'));}
 async function reserveCall(root,batch,job,type,id,origin) {
+  return serial(path.resolve(root,'calls.json'),async()=>{
   const error=message=>{const e=new Error(message);e.noFallback=true;return e;};
   if(await stopRequested(root))throw error('STOP requested; no new generation submitted');
   await checkAuthorization(root,batch);
@@ -194,11 +197,14 @@ async function reserveCall(root,batch,job,type,id,origin) {
   if(ledger.some(x=>x.key===key))throw error('Generation reservation already exists without a reusable receipt; reconcile before resubmitting');
   if(ledger.filter(x=>x.type===type).length>=batch.limits[type+'_calls'])throw error(type+' generation call cap reached');
   ledger.push({key,type,origin,job:job.id,id,at:new Date().toISOString()});await save(file,ledger);
+  });
 }
 async function generated(root,batch,job,type,services) {
   const run=fileAt(root,job.run),limit=job[type==='image'?'images':'videos'],operation=type==='image'?services.frames:services.videos;
   for(let step=0;step<=limit;step++) {
-    const result=await operation(run,{beforeSubmit:(kind,id)=>reserveCall(root,batch,job,kind,id,'api')});
+    const result=await operation(run,{beforeSubmit:(kind,id)=>reserveCall(root,batch,job,kind,id,'api'),
+      imageLimit:services.imageLimit,videoLimit:services.videoLimit,uploadCache:services.uploadCache,
+      reviewFrames:ids=>visual(run,batch,'frames',services,ids)});
     if(!result)return;
     check(result.status==='native_fallback_required'&&batch.policy.hook,'Generation requires an unavailable native hook');
     const name='native-'+type+'-'+result.id+'-'+result.api_receipt,folder=path.join(run,'hooks'),response=path.join(folder,name+'-response.json');
@@ -209,20 +215,24 @@ async function generated(root,batch,job,type,services) {
   }
   throw new Error('Native generation exceeded finite item count');
 }
-async function visual(root,batch,stage,services) {
+async function visual(root,batch,stage,services,ids) {
   if(!batch.policy.visual_check)return;
-  try {await services.verifyQuality(root,stage);return;}catch{}
-  const request=await services.inspect(root,stage);
+  try {await services.verifyQuality(root,stage,ids);return;}catch{}
+  const request=await services.inspect(root,stage,ids);
+  if(request.status==='passed')return;
   const result=await invokeHook(batch.policy.hook,'quality',request,path.join(root,'hooks'),stage+'-'+request.digest);
-  const file=path.join(root,'hooks',stage+'-result.json');await save(file,result);await services.recordQuality(root,file);await services.verifyQuality(root,stage);
+  const file=path.join(root,'hooks',stage+'-result.json');await save(file,result);await services.recordQuality(root,file);await services.verifyQuality(root,stage,ids);
 }
 export async function automaticEdit(root,policy) {
   const plan=await read(path.join(root,'plan.json')),edit={automatic:true,reviewed:false,review_source:'automation',shots:[]};
+  const quality=policy.visual_check?await optional(path.join(root,'quality','videos-review.json')):null;
+  if(quality)await verifyQuality(root,'videos');
   for(const s of plan.shots) {
     const metadata=probe(fileAt(root,`clips/${s.id}.mp4`)),duration=Number(metadata.format.duration);
     check(Number.isFinite(duration)&&duration+0.05>=s.target_duration,'Generated clip is too short');
     check(!s.dialogue.trim()||metadata.streams.some(x=>x.codec_type==='audio'),'Dialogue clip has no audio');
-    edit.shots.push({id:s.id,start:0,duration:s.dialogue.trim()?duration:s.target_duration,dialogue_complete:false});
+    const selected=!s.dialogue.trim()?quality?.items.find(x=>x.id===s.id&&x.passed)?.trim:null;
+    edit.shots.push({id:s.id,start:selected?.start ?? 0,duration:s.dialogue.trim()?duration:selected?.duration ?? s.target_duration,dialogue_complete:false});
   }
   const file=path.join(root,'edit.json');await save(file,edit);
   if(plan.shots.some(s=>s.dialogue.trim())) {
@@ -262,25 +272,28 @@ export async function runMatrix(root,overrides={}) {
   root=path.resolve(root);const services={...defaults,...overrides};
   return withLock(root,async()=>{
     const {batch}=await loadBatch(root);await checkAuthorization(root,batch);
+    const execution=executionSettings(batch.policy.execution || {jobs:batch.policy.concurrency || 1,images:1,videos:1});
+    services.imageLimit=limiter(execution.images);services.videoLimit=limiter(execution.videos);services.uploadCache=new Map();
     const preflight=await services.preflight(root);check(preflight.status==='ready','Batch preflight blocked: '+(preflight.errors || []).join('; '));
     const state=await optional(path.join(root,'state.json')) || {jobs:{}};
-    for(const job of batch.jobs) {
-      if(await stopRequested(root))break;
+    const saveState=()=>serial(path.resolve(root,'state.json'),()=>save(path.join(root,'state.json'),state));
+    await mapLimit(batch.jobs,execution.jobs,async job=>{
+      if(await stopRequested(root))return;
       const run=fileAt(root,job.run),previous=state.jobs[job.id];
       try {
         if(previous?.status==='completed') {
           if(await exists(fileAt(root,job.output)))check(await checksum(fileAt(root,job.output))===previous.sha256,'Delivered output changed; refusing to overwrite');
           else {check(await checksum(path.join(run,'final.mp4'))===previous.sha256,'Completed source changed');await exportVideo(root,job);}
-          continue;
+          return;
         }
         // A failed row is skipped on later launches; resume only work interrupted in progress.
-        if(['failed','blocked'].includes(previous?.status))continue;
+        if(['failed','blocked'].includes(previous?.status))return;
         await withLock(run,async()=>{
-          const stage=async value=>{state.jobs[job.id]={status:'running',stage:value,at:new Date().toISOString()};await save(path.join(root,'state.json'),state);};
+          const stage=async value=>{state.jobs[job.id]={status:'running',stage:value,at:new Date().toISOString()};await saveState();};
           await stage('frames');await generated(root,batch,job,'image',services);await visual(run,batch,'frames',services);
           await approve(run,'Automatic frame gate under upfront unattended authorization; visual check '+(batch.policy.visual_check?'passed via configured model hook':'explicitly disabled'),{source:'automation'});
           await stage('videos');await generated(root,batch,job,'video',services);await visual(run,batch,'videos',services);
-          await stage('finishing');const edit=await services.edit(run,batch.policy);await services.assemble(run,edit);
+          await stage('finishing');const edit=await timed(run,'edit',job.id,()=>services.edit(run,batch.policy));await timed(run,'assemble',job.id,()=>services.assemble(run,edit));
           state.jobs[job.id]={status:'completed',...await exportVideo(root,job),at:new Date().toISOString()};
         });
       }catch(error) {
@@ -291,9 +304,10 @@ export async function runMatrix(root,overrides={}) {
         const pending=receipts.some(x=>!['downloaded','failed'].includes(x.status)&&x.task_id);
         state.jobs[job.id]={status:stopped?'interrupted':uncertain?'blocked':pending?'waiting':'failed',reason:String(error.message).replace(/sk-[\w-]+/g,'[redacted]').slice(0,600),at:new Date().toISOString()};
       }
-      await save(path.join(root,'state.json'),state);
+      await save(path.join(run,'diagnostics.json'),await diagnostics(run));
+      await saveState();
       console.log(JSON.stringify({job:job.id,...state.jobs[job.id]}));
-    }
+    });
     return matrixStatus(root);
   });
 }

@@ -16,7 +16,7 @@ async function fixture(t) {
 }
 async function complete(root,{image='api',video='native',quality='off',music='稍后'}={}) {
   await welcome(root);
-  for(const [id,answer] of [['image',image],['video',video],...([image,video].includes('api')?[['fallback','native']]:[]),['intake','grill'],['quality',quality],['music',music],['workflow','unattended']])await answerWelcome(root,id,answer);
+  for(const [id,answer] of [['image',image],['video',video],...([image,video].includes('api')?[['fallback','native']]:[]),['intake','grill'],['fidelity','balanced'],['quality',quality],['music',music],['workflow','unattended']])await answerWelcome(root,id,answer);
   return answerWelcome(root,'confirm','保存');
 }
 async function product(root) {
@@ -34,7 +34,7 @@ test('welcome asks one question at a time and resumes without activating partial
 test('confirmed choices save mixed routes, optional intake and real preferences without authorizing generation',async t=>{
   const root=await fixture(t),result=await complete(root);assert.equal(result.status,'ready');
   const settings=await loadSettings(root);assert.equal(settings.generation.image,'api');assert.equal(settings.generation.video,'native');assert.deepEqual(settings.generation.fallback,{image:true,video:false});
-  assert.deepEqual(settings.preferences,{product_intake:'grill',visual_check:false,music_library:null,workflow:'unattended'});
+  assert.deepEqual(settings.preferences,{product_intake:'grill',fidelity:'balanced',visual_check:false,music_library:null,workflow:'unattended'});
   assert.equal(settings.grill_reminder_acknowledged,true);assert.equal((await welcome(root)).status,'ready');
   assert.deepEqual(result.agent_preferences,{product_intake:'grill',workflow:'unattended'});
   await assert.rejects(fs.access(path.join(root,'authorization.json')));await assert.rejects(fs.access(path.join(root,'calls.json')));
@@ -77,7 +77,7 @@ test('saved defaults drive future plans and matrices; explicit task overrides wi
 test('different existing image/video fallback choices are retained without reasking',async t=>{
   const root=await fixture(t);await save(path.join(root,'ecommerce-settings.json'),{generation:{image:'api',video:'api',fallback:{image:true,video:false},evidence:'Previously confirmed independent fallback choices'},grill_reminder_acknowledged:true});
   assert.equal((await welcome(root)).question.id,'intake');
-  for(const [id,value] of [['intake','provided'],['quality','off'],['music','稍后'],['workflow','guided'],['confirm','保存']])await answerWelcome(root,id,value);
+  for(const [id,value] of [['intake','provided'],['fidelity','balanced'],['quality','off'],['music','稍后'],['workflow','guided'],['confirm','保存']])await answerWelcome(root,id,value);
   assert.deepEqual((await loadSettings(root)).generation.fallback,{image:true,video:false});
 });
 

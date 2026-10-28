@@ -1,20 +1,24 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {check,read,save,fileAt} from './core.mjs';
+import {serial} from './execution.mjs';
 
 async function optional(file){return read(file).catch(e=>{if(e.code==='ENOENT')return {};throw e;});}
 export async function jobId(root,type,id){return (await optional(path.join(root,'attempts.json')))[`${type}-${id}`]?.receipt || `${type}-${id}`;}
 export async function completeAttempt(root,type,id){
+  return serial(path.resolve(root,'attempts.json'),async()=>{
   const file=path.join(root,'attempts.json'), state=await optional(file), item=state[`${type}-${id}`];
   if(item){item.pending=false;item.completed_at=new Date().toISOString();await save(file,state);}
+  });
 }
-export async function assertNoPending(root,type){
+export async function assertNoPending(root,type,ids){
   const state=await optional(path.join(root,'attempts.json'));
-  check(!Object.entries(state).some(([key,value])=>key.startsWith(type+'-')&&value.pending),`Pending ${type} replacement; finish it before approval or assembly`);
+  check(!Object.entries(state).some(([key,value])=>key.startsWith(type+'-')&&(!ids||ids.includes(key.slice(type.length+1)))&&value.pending),`Pending ${type} replacement; finish it before approval or assembly`);
 }
 export async function prepareRetry(root,type,id,reason){
   check(['image','video'].includes(type),'Retry type must be image or video');check(reason?.trim(),'Retry reason required');
   const p=await read(path.join(root,'plan.json')), frames=new Set();
+  check(!p.automation,'Unattended runs have zero automatic paid retries. Diagnose the failure and prepare a newly authorized repair batch.');
   check((type==='image'?p.frames:p.shots).some(x=>x.id===id),'Unknown retry item');
   if(type==='image'){
     frames.add(id);

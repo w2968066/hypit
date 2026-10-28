@@ -1,5 +1,7 @@
 # 电商版 Hypit：给 Agent 的日常使用约定
 
+模板分析、复刻档位、并发与失败定位见[导演流程](ecommerce-direction.md)。新模板先沿用原版参考分析与生图/视频导演指南，不能只按命令顺序执行就视为完成复刻。
+
 首次可直接说“开始首次使用引导”。Agent使用 `welcome` / `welcome-answer` 一次问一题，最后确认保存；详见[首次使用引导](ecommerce-welcome.md)。
 
 首次先询问生图、生视频分别使用 API 还是当前 Agent 的原生能力，并提醒可选“拷问模式”。

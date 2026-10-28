@@ -12,11 +12,12 @@ import {prepareRetry} from '../scripts/ecommerce/attempts.mjs';
 import {importNative} from '../scripts/ecommerce/native.mjs';
 import {alignCaptions} from '../scripts/ecommerce/finishing.mjs';
 import {welcome,answerWelcome,interactiveWelcome} from '../scripts/ecommerce/welcome.mjs';
+import {diagnostics,timed} from '../scripts/ecommerce/execution.mjs';
 
 async function main() {
   const [cmd,...args]=process.argv.slice(2);
   if(!cmd){if(process.stdin.isTTY&&process.stdout.isTTY){await interactiveWelcome(process.cwd());return;}return welcome(process.cwd());}
-  if(cmd==='--help')return {onboarding:await setup(process.cwd()),commands:{welcome:'welcome [workspace] [--interactive] [--edit]','welcome-answer':'welcome-answer workspace step-id "answer"',setup:'setup workspace [choices.json]',route:'route run-dir choices.json',matrix:'matrix batch-spec.json new-batch-dir','matrix-check':'matrix-check batch-dir','matrix-authorize':'matrix-authorize batch-dir \"actual upfront user authorization\"','matrix-run':'matrix-run batch-dir --submit','matrix-status':'matrix-status batch-dir',compile:'compile analysis.json reference.mp4 new-template-dir',adapt:'adapt template.json product.json',grill:'grill product.json', 'product-info':'product-info product.json [question-id]', 'grill-answer':'grill-answer product.json "answer" [question-id]', 'grill-approve':'grill-approve product.json "review evidence"',plan:'plan template.json product.json new-run-dir',batch:'batch template.json products-dir new-output-dir', 'batch-frames':'batch-frames batch-dir --submit', 'batch-approve':'batch-approve batch-dir "actual whole-batch approval evidence"', 'batch-videos':'batch-videos batch-dir --submit', 'batch-assemble':'batch-assemble batch-dir',frames:'frames run-dir --submit',review:'review run-dir',quality:'quality run-dir on|off',inspect:'inspect run-dir frames|videos','inspect-result':'inspect-result run-dir result.json',retry:'retry run-dir image|video id "reason"','native-import':'native-import run-dir image|video id file "actual native generation evidence"',align:'align run-dir edit.json',approve:'approve run-dir "actual human approval evidence"',videos:'videos run-dir --submit',assemble:'assemble run-dir reviewed-edit.json',status:'status run-dir'}};
+  if(cmd==='--help')return {onboarding:await setup(process.cwd()),commands:{welcome:'welcome [workspace] [--interactive] [--edit]','welcome-answer':'welcome-answer workspace step-id "answer"',setup:'setup workspace [choices.json]',route:'route run-dir choices.json',matrix:'matrix batch-spec.json new-batch-dir','matrix-check':'matrix-check batch-dir','matrix-authorize':'matrix-authorize batch-dir \"actual upfront user authorization\"','matrix-run':'matrix-run batch-dir --submit','matrix-status':'matrix-status batch-dir',compile:'compile analysis.json reference.mp4 new-template-dir',adapt:'adapt template.json product.json',grill:'grill product.json', 'product-info':'product-info product.json [question-id]', 'grill-answer':'grill-answer product.json "answer" [question-id]', 'grill-approve':'grill-approve product.json "review evidence"',plan:'plan template.json product.json new-run-dir',batch:'batch template.json products-dir new-output-dir', 'batch-frames':'batch-frames batch-dir --submit', 'batch-approve':'batch-approve batch-dir "actual whole-batch approval evidence"', 'batch-videos':'batch-videos batch-dir --submit', 'batch-assemble':'batch-assemble batch-dir',frames:'frames run-dir --submit',review:'review run-dir',quality:'quality run-dir on|off',inspect:'inspect run-dir frames|videos [id1,id2]',diagnostics:'diagnostics run-dir','inspect-result':'inspect-result run-dir result.json',retry:'retry run-dir image|video id "reason"','native-import':'native-import run-dir image|video id file "actual native generation evidence"',align:'align run-dir edit.json',approve:'approve run-dir "actual human approval evidence"',videos:'videos run-dir --submit',assemble:'assemble run-dir reviewed-edit.json',status:'status run-dir'}};
   if(cmd==='welcome'){
     const result=await (args.includes('--interactive')?interactiveWelcome:welcome)(args.find(arg=>!arg.startsWith('--')) || process.cwd(),{edit:args.includes('--edit')});
     return args.includes('--interactive')&&process.stdin.isTTY&&process.stdout.isTTY?undefined:result;
@@ -72,7 +73,8 @@ async function main() {
   return withLock(root,async()=>{
     if(cmd==='route')return setRunGeneration(root,args[1]);
     if(cmd==='quality')return setQuality(root,args[1]);
-    if(cmd==='inspect')return inspect(root,args[1]);
+    if(cmd==='inspect')return timed(root,'inspect',args[1],()=>inspect(root,args[1],args[2]?.split(',')));
+    if(cmd==='diagnostics')return diagnostics(root);
     if(cmd==='inspect-result')return recordQuality(root,args[1]);
     if(cmd==='retry')return prepareRetry(root,args[1],args[2],args[3]);
     if(cmd==='native-import')return importNative(root,args[1],args[2],args[3],args[4]);
@@ -83,7 +85,7 @@ async function main() {
       if(cmd==='frames'){const r=await generateFrames(root);return r || review(root);}
       const r=await generateVideos(root);return r || {status:'clips ready for dialogue/timing review'};
     }
-    if(cmd==='assemble')return assemble(root,args[1]);
+    if(cmd==='assemble')return timed(root,'assemble','final',()=>assemble(root,args[1]));
     throw new Error('Unknown command');
   });
 }

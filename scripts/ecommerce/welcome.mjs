@@ -14,6 +14,7 @@ function steps(answers) {
   if(answers.image==='api'||answers.video==='api')result.push({id:'fallback',title:'失败处理',question:'API 明确失败后，是否允许用实际可用的原生能力兜底？',detail:'结果未知的API请求仍须先核对，不会直接重复生成。',options:choices(['none','native'],['保留失败记录，不自动切换','允许原生兜底（能力存在时）'])});
   result.push(
     {id:'intake',title:'产品卖点',question:'新产品默认怎样准备卖点？',detail:grillReminder,options:choices(['grill','provided'],['开启拷问模式，先聊透卖点','直接使用我提供的产品资料'])},
+    {id:'fidelity',title:'复刻程度',question:'默认允许对参考视频做多大调整？',detail:'严格：保留动作、运镜与节奏。平衡：保留关键动作，允许次要调整。创意：保留叙事，允许重设计镜头。均不自动上传参考视频或切换付费模型；单次任务可以覆盖。',options:choices(['balanced','strict','creative'],['平衡复刻（推荐）','严格复刻','创意改编'])},
     {id:'quality',title:'视觉检查',question:'默认开启模型视觉检查吗？',detail:'检查商品保持、穿模和场景连续性。关闭可提高速度；无人值守开启检查时需要接好真实视觉接口。',options:choices(['on','off'],['开启检查','关闭检查，优先速度'])},
     {id:'music',title:'音乐库',question:'填写音乐库文件夹路径，或输入“稍后”跳过。',detail:'你自行筛选和预处理音频，程序每次随机选一首。纯配乐模板在开始生产前仍需要音乐。',input:'folder',can_skip:true},
     {id:'workflow',title:'默认流程',question:'平时默认使用哪种生产流程？',detail:'逐步审核会先预览首帧。无人值守在任务资料、能力接口和整批授权齐备后自动生产；本次引导不会提交生成。',options:choices(['guided','unattended'],['逐步审核','批量无人值守'])},
@@ -28,6 +29,8 @@ async function initialState(root) {
     else if(apiKinds.length)answers.fallback=known.fallback;
   }
   if(['grill','provided'].includes(p.product_intake))answers.intake=p.product_intake;
+  if(['strict','balanced','creative'].includes(p.fidelity))answers.fidelity=p.fidelity;
+  else if(settings?.onboarding_completed)answers.fidelity='balanced';
   if(typeof p.visual_check==='boolean')answers.quality=p.visual_check?'on':'off';
   if(Object.hasOwn(p,'music_library'))answers.music=p.music_library?.path || null;
   if(['guided','unattended'].includes(p.workflow))answers.workflow=p.workflow;
@@ -42,6 +45,7 @@ function summary(a) {
     生视频:a.video==='api'?'API · Grok · 720p · 9:16':a.video==='native'?'Agent原生生视频':'未选择',
     API失败兜底:a.image!=='api'&&a.video!=='api'?'不适用':typeof a.fallback==='object'?`生图${a.fallback.image?'允许':'不允许'}、生视频${a.fallback.video?'允许':'不允许'}`:a.fallback==='native'?'允许实际可用的原生能力':'不自动切换',
     产品卖点:a.intake==='grill'?'优先拷问，复用已有档案':a.intake==='provided'?'使用现有资料':'未选择',
+    复刻程度:({strict:'严格复刻',balanced:'平衡复刻',creative:'创意改编'})[a.fidelity] || '未选择',
     视觉检查:a.quality==='on'?'开启':a.quality==='off'?'关闭':'未选择',音乐库:a.music || '暂不设置',
     默认流程:a.workflow==='unattended'?'批量无人值守':a.workflow==='guided'?'逐步审核':'未选择'};
 }
@@ -72,6 +76,7 @@ export async function welcome(root=process.cwd(),{edit=false}={}) {
 }
 function optionAnswer(step,text) {
   const aliases={api:['api','接口','api生图','api生视频'],native:['native','原生','原生能力','原生生图','原生生视频','允许','允许兜底'],none:['none','不允许','不兜底','否'],grill:['grill','拷问','开启拷问模式','开启','是'],provided:['provided','现有资料','直接使用资料','否'],on:['on','开启','是'],off:['off','关闭','否'],guided:['guided','逐步审核','手动'],unattended:['unattended','无人值守','全自动'],save:['save','保存','确认','是'],later:['later','稍后','暂不保存','否']};
+  Object.assign(aliases,{strict:['strict','严格','严格复刻'],balanced:['balanced','平衡','平衡复刻'],creative:['creative','创意','创意改编']});
   const value=text.trim().toLowerCase(),selected=step.options.find((option,i)=>value===String(i+1)||value===option.label.toLowerCase()||(aliases[option.value] || []).includes(value));
   check(selected,'答案无法识别，请选择当前列出的选项编号或名称');return selected.value;
 }
@@ -87,7 +92,7 @@ export async function answerWelcome(root,id,text) {
         fallback:{image:a.image==='api'&&(typeof a.fallback==='object'?a.fallback.image:a.fallback==='native'),video:a.video==='api'&&(typeof a.fallback==='object'?a.fallback.video:a.fallback==='native')},
         evidence:'用户通过首次使用引导逐项选择并确认保存'});
       await save(path.join(root,'ecommerce-settings.json'),{...previous,schema:'hypit.ecommerce.settings.v1',generation,
-        grill_reminder_acknowledged:true,onboarding_completed:true,preferences:{...previous.preferences,product_intake:a.intake,visual_check:a.quality==='on',music_library:a.music?{path:a.music,gain:0.18}:null,workflow:a.workflow},at:new Date().toISOString()});
+        grill_reminder_acknowledged:true,onboarding_completed:true,preferences:{...previous.preferences,product_intake:a.intake,fidelity:a.fidelity,visual_check:a.quality==='on',music_library:a.music?{path:a.music,gain:0.18}:null,workflow:a.workflow},at:new Date().toISOString()});
       state.completed=true;
     } else {
       check(step,'未知或当前不适用的引导步骤');

@@ -17,9 +17,13 @@ production executes a fixed graph and never runs an autonomous reasoning loop.
 
 ## Template-making procedure
 
+Read [the source-direction and execution contract](ecommerce-direction.md) first. New templates
+require observed `shots[].direction`, not merely freeform prompts. Existing compiled templates
+remain readable; strict recreation requires upgrading their source analysis.
+
 1. Probe source media and detect candidate cuts with local media tools.
 2. Transcribe spoken Chinese with timestamps. Review recognition errors against the source.
-3. Write `analysis.json` following `examples/ecommerce-basic/analysis.json`: retain story,
+3. Write `analysis.json` following the direction contract (older examples show the legacy schema): retain story,
    roles, speaker order, intended rhythm and physical support relationships. Record original
    visual cuts separately from speech-led production segments when they differ.
 4. Abstract the hook, relationship, product evidence and daily payoff as reusable narrative logic.
@@ -27,7 +31,7 @@ production executes a fixed graph and never runs an autonomous reasoning loop.
    A cardigan frames the upper body; a non-wearable can be held or used. Category maps are
    optional presets, never a whitelist. `adaptation.slots` and `adaptation.shots` can adapt any
    product with reviewed facts; `ecommerce adapt template.json product.json` lists missing slots.
-5. Review the structure, set `reviewed: true`, then compile clips and the original audio mix.
+5. Review motion, camera, shot starting states and evidence as well as structure; set `reviewed: true`, then compile clips and the original audio mix.
    ASR uncertainty remains explicit in `analysis_status`; review it before production approval.
 6. Review a representative garment and non-wearable adaptation, then publish a template version.
    Universal narrative structure does not guarantee every generated shot's visual quality.

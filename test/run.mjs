@@ -8,7 +8,7 @@ const patterns = [
   "packages/*/test/**/*.test.ts",
   "services/*/test/**/*.test.ts",
   "test/**/*.test.ts",
-  "test/ecommerce.test.mjs",
+  "test/ecommerce*.test.mjs",
   // Project-package behavior is part of ordinary authoring and belongs in the suite.
   "examples/*/packages/*/test/**/*.test.ts",
 ];

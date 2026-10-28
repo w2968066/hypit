@@ -86,8 +86,9 @@ node bin/hypit.mjs ecommerce matrix-status new-batch
 `matrix-check` 检查配置、FFmpeg、FFprobe、音乐库、语音识别和接口能力，不提交生图或生视频。
 口播模式需要本地 Python，执行 `python -m pip install -r scripts/ecommerce/requirements-asr.txt` 安装 faster-whisper 和 pypinyin。提前缓存模型，避免无人值守时才下载。
 
-启动后：串行锁景生图→可选模型视觉检查→自动首帧放行→生视频→可选视频抽样检查→本地对白核对→字幕、音乐、合成→商品归档。自动放行明确记录为 automation，不冒充人工看图。
-初版串行排队，每个输出只走有限节点；默认不自动付费重试，不会产生无限重做循环。
+启动后：父图生成→可选父图检查→独立派生图限量并发→检查新增图→自动首帧放行→独立视频限量并发→可选动作/穿帮检查→本地对白核对→字幕、音乐、合成→商品归档。自动放行明确记录为 automation，不冒充人工看图。
+新批次默认 execution={jobs:2,images:2,videos:3}，图片/视频上限在整批共享；可设置1–8。旧批次保留已授权设置。
+每个输出只走有限节点，不自动付费重试；失败项留档，修复后准备新任务。复刻档位、动作记录、主图关卡、上传缓存和耗时诊断见[导演流程](ecommerce-direction.md)。
 
 ```text
 new-batch/

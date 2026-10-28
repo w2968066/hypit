@@ -13,7 +13,7 @@ const generation={image:'api',video:'api',fallback:{image:false,video:false},evi
 async function fixture(t,products=1,templates=1,repeat=1,extra={}) {
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'hypit-matrix-'));
   t.after(()=>fs.rm(root,{recursive:true,force:true}));
-  const spec={schema:'hypit.ecommerce.matrix-input.v1',products_dir:'products',templates:[],generation,repeat,visual_check:false,...extra};
+  const spec={schema:'hypit.ecommerce.matrix-input.v1',products_dir:'products',templates:[],generation,repeat,visual_check:false,execution:{jobs:1},...extra};
   for(let i=0;i<products;i++) {
     const folder=path.join(root,'products','款式 '+i);await save(path.join(folder,'product.json'),{id:'p'+i,references:['ref.png'],facts:{description:'Known product '+i},slots:{product:'Product '+i}});await fs.writeFile(path.join(folder,'ref.png'),'test reference');
   }
@@ -40,6 +40,21 @@ function mockRuntime(counters,options={}) {
     assemble:async root=>{const plan=await read(path.join(root,'plan.json'));await fs.writeFile(path.join(root,'final.mp4'),'Mock delivery '+plan.automation.job);},
   };
 }
+
+test('parallel batch rows respect a shared call cap without lost reservations',async t=>{
+  const f=await fixture(t,4,1,1,{execution:{jobs:4,images:2,videos:2},limits:{image_calls:2,video_calls:2}});
+  await prepareMatrix(f.specFile,f.batch);await authorizeMatrix(f.batch,'Offline capped parallel batch');
+  const counters={images:0,videos:0},result=await runMatrix(f.batch,mockRuntime(counters));
+  assert.equal(result.completed,2);assert.equal(result.failed,2);assert.deepEqual(counters,{images:2,videos:2});
+  const calls=await read(path.join(f.batch,'calls.json'));assert.equal(calls.length,4);assert.equal(new Set(calls.map(x=>x.key)).size,4);
+});
+
+test('parallel rows share provider slots and retain all completed states',async t=>{
+  const f=await fixture(t,4,1,1,{execution:{jobs:4,images:2,videos:2}});await prepareMatrix(f.specFile,f.batch);await authorizeMatrix(f.batch,'Offline parallel batch');
+  const counters={images:0,videos:0},runtime=mockRuntime(counters),frames=runtime.frames;let active=0,peak=0;
+  runtime.frames=(root,options)=>options.imageLimit(async()=>{active++;peak=Math.max(peak,active);try{await new Promise(resolve=>setTimeout(resolve,20));await frames(root,options);}finally{active--;}});
+  const result=await runMatrix(f.batch,runtime);assert.equal(result.completed,4);assert.equal(peak,2);assert.equal(Object.keys((await read(path.join(f.batch,'state.json'))).jobs).length,4);
+});
 
 test('first use asks route choices and mentions grill; settled choices are remembered',async t=>{
   const {root}=await fixture(t);const first=await setup(root);assert.equal(first.status,'user_choice_required');assert.match(first.reminder,/拷问/);assert.equal(first.questions.length,3);
@@ -154,16 +169,27 @@ test('per-template adaptation and background rotation are fixed before repeats r
   assert.match(plans[0].frames[0].prompt,/上半身门襟 背景甲/);assert.match(plans[1].frames[0].prompt,/上半身门襟 背景乙/);
 });
 
-test('native hook, local assembly, random library music and product export complete without a human gate',async t=>{
-  const f=await fixture(t,1,1,1,{generation:{...generation,image:'native',video:'native'},music_library:{path:'music'},hook:{command:process.execPath,args:['hook.mjs']}});
+test('native and quality hooks check parent before child, then assemble/export without duplicate reviews',async t=>{
+  const f=await fixture(t,1,1,1,{generation:{...generation,image:'native',video:'native'},visual_check:true,music_library:{path:'music'},hook:{command:process.execPath,args:['hook.mjs']}});
+  const templateFile=path.join(f.root,'template-0.json'),template=await read(templateFile);template.frames.push({id:'close',parent:'scene',prompt:'Close product view'});template.shots[0].frame='close';await save(templateFile,template);
   // Offline mock generator supplies real synthetic media, never calls a model/provider.
   media(['-y','-f','lavfi','-i','color=c=blue:s=720x1280:r=30','-t','2','-an','-c:v','libx264','-preset','ultrafast',path.join(f.root,'synthetic.mp4')]);
   media(['-y','-i',path.join(f.root,'synthetic.mp4'),'-frames:v','1',path.join(f.root,'synthetic.png')]);
   await fs.mkdir(path.join(f.root,'music'));media(['-y','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','1',path.join(f.root,'music/tone.wav')]);
-  await fs.writeFile(path.join(f.root,'hook.mjs'),`import fs from 'node:fs/promises';import path from 'node:path';const [request,response]=process.argv.slice(2),r=JSON.parse(await fs.readFile(request,'utf8'));const result=r.kind==='capabilities'?{capabilities:['native:image','native:video']}:{file:path.resolve(r.payload.type==='image'?'synthetic.png':'synthetic.mp4'),evidence:'OFFLINE TEST: synthetic fixture returned by mock native adapter'};await fs.writeFile(response,JSON.stringify({request_digest:r.request_digest,result}));`);
+  await fs.writeFile(path.join(f.root,'hook.mjs'),`import fs from 'node:fs/promises';import path from 'node:path';const [request,response]=process.argv.slice(2),r=JSON.parse(await fs.readFile(request,'utf8'));let result;
+  if(r.kind==='capabilities')result={capabilities:['native:image','native:video','quality']};
+  else if(r.kind==='quality'){
+    const seen=JSON.parse(await fs.readFile('reviews.json','utf8').catch(()=>'[]'));seen.push({stage:r.payload.stage,ids:r.payload.items.map(x=>x.id)});await fs.writeFile('reviews.json',JSON.stringify(seen));
+    if(r.payload.stage==='frames'&&r.payload.items.some(x=>x.id==='scene'))await fs.writeFile('parent-reviewed','fixture');
+    result={stage:r.payload.stage,digest:r.payload.digest,items:r.payload.items.map(x=>({id:x.id,passed:true,findings:[],evidence:'OFFLINE TEST synthetic media reviewer'}))};
+  }else{
+    if(r.payload.type==='image'&&r.payload.id==='close')await fs.access('parent-reviewed');
+    result={file:path.resolve(r.payload.type==='image'?'synthetic.png':'synthetic.mp4'),evidence:'OFFLINE TEST: synthetic fixture returned by mock native adapter'};
+  }await fs.writeFile(response,JSON.stringify({request_digest:r.request_digest,result}));`);
   await prepareMatrix(f.specFile,f.batch);await authorizeMatrix(f.batch,'Mock user authorized one unattended native production');const result=await runMatrix(f.batch);
-  assert.equal(result.completed,1);assert.equal(result.failed,0);assert.deepEqual(result.calls,{image:1,video:1});
+  assert.equal(result.completed,1);assert.equal(result.failed,0);assert.deepEqual(result.calls,{image:2,video:1});
+  const reviews=await read(path.join(f.root,'reviews.json'));assert.deepEqual(reviews.filter(x=>x.stage==='frames').map(x=>x.ids),[['scene'],['close']]);
   const output=path.join(f.batch,result.jobs[0].output),metadata=probe(output),video=metadata.streams.find(x=>x.codec_type==='video');assert.equal(video.width,720);assert.equal(video.height,1280);assert.ok(metadata.streams.some(x=>x.codec_type==='audio'));
   const batch=await read(path.join(f.batch,'matrix.json')),receipt=await read(path.join(f.batch,batch.jobs[0].run,'assembly/music-selection.json'));assert.equal(receipt.chosen,'tone.wav');
-  const sha=hash(await fs.readFile(output));await runMatrix(f.batch);assert.equal(hash(await fs.readFile(output)),sha);assert.deepEqual((await matrixStatus(f.batch)).calls,{image:1,video:1});
+  const sha=hash(await fs.readFile(output));await runMatrix(f.batch);assert.equal(hash(await fs.readFile(output)),sha);assert.deepEqual((await matrixStatus(f.batch)).calls,{image:2,video:1});
 });

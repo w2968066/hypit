@@ -1,5 +1,7 @@
 # Mother–daughter product-link template
 
+Legacy template example: existing compiled copies remain usable. Before compiling a new version, inspect the source and add `shots[].direction` as described in [the direction contract](../../docs/guide/ecommerce-direction.md). Do not infer source evidence from the old prompt alone.
+
 Provisional sample for the fork's `hypit ecommerce` command. Read
 `docs/guide/ecommerce-basic.md` before use. The source video and user reference image are
 intentionally not committed.
